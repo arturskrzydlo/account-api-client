@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/arturskrzydlo/account-api-client/pkg"
+	"github.com/arturskrzydlo/account-api-client/api/internal/models"
 	"go.uber.org/zap"
 )
 
@@ -14,8 +14,8 @@ const (
 )
 
 type AccountClient interface {
-	CreateAccount(ctx context.Context, accountData *pkg.AccountData) error
-	FetchAccount(ctx context.Context, accountID string) (account *pkg.AccountData, err error)
+	CreateAccount(ctx context.Context, accountData *models.AccountData) error
+	FetchAccount(ctx context.Context, accountID string) (account *models.AccountData, err error)
 	DeleteAccount(ctx context.Context, accountID string) error
 }
 
@@ -26,12 +26,12 @@ type Client struct {
 	httpClient *http.Client
 }
 
-func (c *Client) CreateAccount(ctx context.Context, accountData *pkg.AccountData) error {
+func (c *Client) CreateAccount(ctx context.Context, accountData *models.AccountData) error {
 	// TODO implement me
 	panic("implement me")
 }
 
-func (c *Client) FetchAccount(ctx context.Context, accountId string) (account *pkg.AccountData, err error) {
+func (c *Client) FetchAccount(ctx context.Context, accountId string) (account *models.AccountData, err error) {
 	// TODO implement me
 	panic("implement me")
 }

@@ -7,7 +7,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/arturskrzydlo/account-api-client/pkg"
+	"github.com/arturskrzydlo/account-api-client/api/internal/models"
 	"github.com/stretchr/testify/suite"
 )
 
@@ -26,21 +26,18 @@ func (s *accountApiClientSuite) SetupSuite() {
 }
 
 func (s *accountApiClientSuite) TestCreateAccount() {
-
 	s.Run("should successfully create single account", func() {
-		s.Assert().NotNil(s.accountApiClient.CreateAccount(context.Background(), &pkg.AccountData{}))
+		s.Assert().NotNil(s.accountApiClient.CreateAccount(context.Background(), &models.AccountData{}))
 	})
 }
 
 func (s *accountApiClientSuite) TestFetchAccount() {
-
 	s.Run("should successfully fetch single account", func() {
 		s.Assert().NotNil(s.accountApiClient.FetchAccount(context.Background(), "account-id"))
 	})
 }
 
 func (s *accountApiClientSuite) TestDeleteAccount() {
-
 	s.Run("should successfully delete single account", func() {
 		s.Assert().NotNil(s.accountApiClient.FetchAccount(context.Background(), "account-id"))
 	})
