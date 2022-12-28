@@ -1,0 +1,122 @@
+run:
+  # Force golangci-lint to pass `mod=vendor` as needed.
+  modules-download-mode: vendor
+  # timeout for analysis, e.g. 30s, 5m, default is 1m
+  timeout: 10m
+  # include test files or not, default is true
+  tests: true
+  issues-exit-code: 1
+
+issues:
+  fix: false
+  max-issues-per-linter: 0
+  max-same-issues: 0
+
+linters:
+  enable-all: true
+  disable:
+    - contextcheck
+    - dupl # a lot of false positives
+    - exhaustruct # a lot of noise
+    - funlen
+    - gci
+    - gochecknoglobals
+    - gochecknoinits
+    - godot
+    - godox
+    - goerr113 # No need to make each and every error a sentinel error
+    - maintidx
+    - nlreturn
+    - nonamedreturns
+    - paralleltest
+    - testpackage
+    - varnamelen
+    - whitespace
+    - wsl
+    # Deprecated linters:
+    - deadcode
+    - exhaustivestruct
+    - golint
+    - ifshort
+    - interfacer
+    - maligned
+    - nosnakecase
+    - scopelint
+    - structcheck
+    - varcheck
+
+
+linters-settings:
+  cyclop:
+    # The maximal code complexity to report. Default: 10
+    max-complexity: 20
+    # The maximal average package complexity. If it's higher than 0.0 (float) the check is enabled. Default: 0.0
+    package-average: 0.0
+    # Should ignore tests. Default: false
+    skip-tests: false
+  dogsled:
+    max-blank-identifiers: 2
+  errcheck:
+    check-blank: false
+  errorlint:
+    errorf: true
+    asserts: true
+    comparison: true
+  exhaustive:
+    check-generated: false
+    default-signifies-exhaustive: false
+  goimports:
+    local-prefixes: github.com/arturskrzydlo/account-api-client
+  gocognit:
+    min-complexity: 15
+  gocritic:
+    enabled-tags:
+      - diagnostic
+      - experimental
+      - opinionated
+      - performance
+      - style
+    disabled-checks:
+      - paramTypeCombine
+  govet:
+    check-shadowing: true
+  nakedret:
+    # don't allow naked returns
+    max-func-lines: 0
+  revive:
+    # see https://github.com/mgechev/revive#available-rules for details.
+    ignore-generated-header: true
+    severity: warning
+    rules:
+      - name: blank-imports
+      - name: context-as-argument
+      - name: context-keys-type
+      - name: dot-imports
+      - name: error-return
+      - name: error-strings
+      - name: error-naming
+      - name: exported
+      - name: if-return
+      - name: increment-decrement
+      - name: var-naming
+      - name: var-declaration
+      - name: package-comments
+      - name: range
+      - name: receiver-naming
+      - name: time-naming
+      - name: unexported-return
+      - name: indent-error-flow
+      - name: errorf
+      - name: empty-block
+      - name: superfluous-else
+      - name: unused-parameter
+      - name: unreachable-code
+      - name: redefines-builtin-id
+      - name: defer
+  staticcheck:
+    # https://staticcheck.io/docs/options#checks
+    checks: [ "all" ]
+  tagliatelle:
+    case:
+      rules:
+        json: snake
