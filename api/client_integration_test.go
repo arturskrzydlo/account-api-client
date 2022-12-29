@@ -36,9 +36,9 @@ func (s *accountApiClientSuite) TestCreateAccount() {
 
 		// then
 		s.Assert().NoError(err)
-		fetchedAccount, err := s.accountApiClient.FetchAccount(context.Background(), account.ID)
+		fetchedAccount, err := s.accountApiClient.FetchAccount(context.Background(), account.Data.ID)
 		s.Assert().NoError(err)
-		s.assertCreatedAccount(account, fetchedAccount)
+		s.assertCreatedAccount(account.Data, fetchedAccount.Data)
 	})
 }
 
@@ -50,22 +50,34 @@ func (s *accountApiClientSuite) TestFetchAccount() {
 		s.Require().NoError(err)
 
 		// when
-		fetchedAccount, err := s.accountApiClient.FetchAccount(context.Background(), account.ID)
+		fetchedAccount, err := s.accountApiClient.FetchAccount(context.Background(), account.Data.ID)
 
 		// then
 		s.Assert().NoError(err)
 		s.Assert().NoError(err)
-		s.assertCreatedAccount(account, fetchedAccount)
+		s.assertCreatedAccount(account.Data, fetchedAccount.Data)
 	})
 }
 
 func (s *accountApiClientSuite) TestDeleteAccount() {
 	s.Run("should successfully delete single account", func() {
-		s.Assert().NotNil(s.accountApiClient.FetchAccount(context.Background(), "account-id"))
+		// given
+		account := createAccount()
+		err := s.accountApiClient.CreateAccount(context.Background(), account)
+		s.Require().NoError(err)
+
+		// when
+		err = s.accountApiClient.DeleteAccount(context.Background(), account.Data.ID, *account.Data.Version)
+
+		// then
+		s.Require().NoError(err)
+		fetchedAccount, err := s.accountApiClient.FetchAccount(context.Background(), account.Data.ID)
+		s.Require().NoError(err)
+		s.Assert().Nil(fetchedAccount)
 	})
 }
 
-func createAccount() *models.AccountData {
+func createAccount() *models.Account {
 	accountID := uuid.New().String()
 	organizationID := uuid.New().String()
 	version := new(int64)
@@ -75,7 +87,7 @@ func createAccount() *models.AccountData {
 	country := "GB"
 	jointAccount := false
 
-	return &models.AccountData{
+	return &models.Account{Data: &models.AccountData{
 		Attributes: &models.AccountAttributes{
 			AccountClassification:   &accountClassification, // enum ?
 			AccountMatchingOptOut:   &accountMatchingOptOut, // deprecated
@@ -97,7 +109,7 @@ func createAccount() *models.AccountData {
 		OrganisationID: organizationID,
 		Type:           "accounts",
 		Version:        version, // incremented witch each update, probably not needed in create
-	}
+	}}
 }
 
 func (s *accountApiClientSuite) assertCreatedAccount(expectedAccount *models.AccountData, actualAccount *models.AccountData) {
