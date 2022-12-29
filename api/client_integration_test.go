@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/arturskrzydlo/account-api-client/api/internal/models"
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/suite"
 )
 
@@ -28,7 +29,7 @@ func (s *accountApiClientSuite) SetupSuite() {
 func (s *accountApiClientSuite) TestCreateAccount() {
 	s.Run("should successfully create single account", func() {
 		// given
-		account := createAccount("test-account-id", "test-organization-id")
+		account := createAccount()
 
 		// when
 		err := s.accountApiClient.CreateAccount(context.Background(), account)
@@ -43,7 +44,18 @@ func (s *accountApiClientSuite) TestCreateAccount() {
 
 func (s *accountApiClientSuite) TestFetchAccount() {
 	s.Run("should successfully fetch single account", func() {
-		s.Assert().NotNil(s.accountApiClient.FetchAccount(context.Background(), "account-id"))
+		// given
+		account := createAccount()
+		err := s.accountApiClient.CreateAccount(context.Background(), account)
+		s.Require().NoError(err)
+
+		// when
+		fetchedAccount, err := s.accountApiClient.FetchAccount(context.Background(), account.ID)
+
+		// then
+		s.Assert().NoError(err)
+		s.Assert().NoError(err)
+		s.assertCreatedAccount(account, fetchedAccount)
 	})
 }
 
@@ -53,7 +65,9 @@ func (s *accountApiClientSuite) TestDeleteAccount() {
 	})
 }
 
-func createAccount(accountID string, organizationID string) *models.AccountData {
+func createAccount() *models.AccountData {
+	accountID := uuid.New().String()
+	organizationID := uuid.New().String()
 	version := new(int64)
 	*version = 0
 	accountClassification := "Personal"
