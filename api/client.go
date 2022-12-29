@@ -18,8 +18,8 @@ const (
 )
 
 type AccountClient interface {
-	CreateAccount(ctx context.Context, accountData *models.Account) error
-	FetchAccount(ctx context.Context, accountID string) (account *models.Account, err error)
+	CreateAccount(ctx context.Context, accountData *models.CreateAccountRequest) error
+	FetchAccount(ctx context.Context, accountID string) (account *models.AccountResponse, err error)
 	DeleteAccount(ctx context.Context, accountID string, version int64) error
 }
 
@@ -33,7 +33,7 @@ type ResponseBody struct {
 	ErrorMessage string `json:"error_message"`
 }
 
-func (c *Client) CreateAccount(ctx context.Context, accountData *models.Account) error {
+func (c *Client) CreateAccount(ctx context.Context, accountData *models.CreateAccountRequest) error {
 	reqBody, err := json.Marshal(accountData)
 	if err != nil {
 		c.logger.Error("failed to serialize account body", zap.Error(err))
@@ -61,7 +61,7 @@ func (c *Client) CreateAccount(ctx context.Context, accountData *models.Account)
 	return nil
 }
 
-func (c *Client) FetchAccount(ctx context.Context, accountID string) (account *models.Account, err error) {
+func (c *Client) FetchAccount(ctx context.Context, accountID string) (account *models.AccountResponse, err error) {
 	request, err := http.NewRequest(http.MethodGet, fmt.Sprintf("%s/organisation/accounts/%s", c.baseURL, accountID), http.NoBody)
 	if err != nil {
 		c.logger.Error("failed to get accounts", zap.Error(err))
@@ -87,7 +87,7 @@ func (c *Client) FetchAccount(ctx context.Context, accountID string) (account *m
 			c.logger.Error("failed to read pca response body: ", zap.Error(err))
 		}
 
-		var account models.Account
+		var account models.AccountResponse
 		if err := json.Unmarshal(body, &account); err != nil {
 			c.logger.Error("failed to read pca response body: ", zap.Error(err))
 		}

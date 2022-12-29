@@ -29,7 +29,7 @@ func (s *accountApiClientSuite) SetupSuite() {
 func (s *accountApiClientSuite) TestCreateAccount() {
 	s.Run("should successfully create single account", func() {
 		// given
-		account := createAccount()
+		account := createAccountRequest()
 
 		// when
 		err := s.accountApiClient.CreateAccount(context.Background(), account)
@@ -45,7 +45,7 @@ func (s *accountApiClientSuite) TestCreateAccount() {
 func (s *accountApiClientSuite) TestFetchAccount() {
 	s.Run("should successfully fetch single account", func() {
 		// given
-		account := createAccount()
+		account := createAccountRequest()
 		err := s.accountApiClient.CreateAccount(context.Background(), account)
 		s.Require().NoError(err)
 
@@ -62,7 +62,7 @@ func (s *accountApiClientSuite) TestFetchAccount() {
 func (s *accountApiClientSuite) TestDeleteAccount() {
 	s.Run("should successfully delete single account", func() {
 		// given
-		account := createAccount()
+		account := createAccountRequest()
 		err := s.accountApiClient.CreateAccount(context.Background(), account)
 		s.Require().NoError(err)
 
@@ -77,7 +77,7 @@ func (s *accountApiClientSuite) TestDeleteAccount() {
 	})
 }
 
-func createAccount() *models.Account {
+func createAccountRequest() *models.CreateAccountRequest {
 	accountID := uuid.New().String()
 	organizationID := uuid.New().String()
 	version := new(int64)
@@ -87,8 +87,8 @@ func createAccount() *models.Account {
 	country := "GB"
 	jointAccount := false
 
-	return &models.Account{Data: &models.AccountData{
-		Attributes: &models.AccountAttributes{
+	return &models.CreateAccountRequest{Data: &models.CreateAccountData{
+		Attributes: &models.CreateAccountAttributes{
 			AccountClassification:   &accountClassification, // enum ?
 			AccountMatchingOptOut:   &accountMatchingOptOut, // deprecated
 			AccountNumber:           "41426819",
@@ -112,7 +112,7 @@ func createAccount() *models.Account {
 	}}
 }
 
-func (s *accountApiClientSuite) assertCreatedAccount(expectedAccount *models.AccountData, actualAccount *models.AccountData) {
+func (s *accountApiClientSuite) assertCreatedAccount(expectedAccount *models.CreateAccountData, actualAccount *models.AccountDataResponse) {
 	s.Assert().Equal(expectedAccount.ID, actualAccount.ID)
 	s.Assert().Equal(expectedAccount.Type, actualAccount.Type)
 	s.Assert().Equal(expectedAccount.Version, actualAccount.Version)
@@ -135,4 +135,9 @@ func (s *accountApiClientSuite) assertCreatedAccount(expectedAccount *models.Acc
 	s.Assert().Equal(expectedAccount.Attributes.JointAccount, actualAccount.Attributes.JointAccount)
 	s.Assert().Equal(expectedAccount.Attributes.Name[0], actualAccount.Attributes.Name[0])
 	s.Assert().Equal(expectedAccount.Attributes.SecondaryIdentification, actualAccount.Attributes.SecondaryIdentification)
+	s.Assert().Equal(expectedAccount.Attributes.Status, actualAccount.Attributes.Status)
+	s.Assert().Equal(expectedAccount.Attributes.Switched, actualAccount.Attributes.Switched)
+
+	s.Assert().False(actualAccount.CreatedOn.IsZero())
+	s.Assert().False(actualAccount.ModifiedOn.IsZero())
 }
