@@ -23,7 +23,7 @@ func TestAccountApiClient(t *testing.T) {
 }
 
 func (s *accountApiClientSuite) SetupSuite() {
-	s.accountApiClient = NewClient("test-api-key")
+	s.accountApiClient = NewAccountsClient("http://localhost:8080/v1")
 }
 
 func (s *accountApiClientSuite) TestCreateAccount() {

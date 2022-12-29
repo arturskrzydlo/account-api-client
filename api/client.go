@@ -41,13 +41,14 @@ func (c *Client) DeleteAccount(ctx context.Context, accountId string) error {
 	panic("implement me")
 }
 
-func NewClient(apiKey string) *Client {
+func NewAccountsClient(baseURL string) *Client {
 	logger, _ := zap.NewProduction()
-
+	if baseURL == "" {
+		baseURL = baseURLV1
+	}
 	return &Client{
-		apiKey:     apiKey,
 		baseURL:    baseURLV1,
-		httpClient: &http.Client{Timeout: time.Second * 20},
+		httpClient: &http.Client{Timeout: time.Second * 5},
 		logger:     logger,
 	}
 }
