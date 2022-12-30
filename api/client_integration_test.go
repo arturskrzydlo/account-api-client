@@ -105,7 +105,9 @@ func (s *accountApiClientSuite) TestDeleteAccount() {
 		// then
 		s.Require().NoError(err)
 		fetchedAccount, err := s.accountApiClient.FetchAccount(context.Background(), account.Data.ID)
-		s.Require().NoError(err)
+		var reqErr *RequestError
+		s.Assert().ErrorAs(err, &reqErr)
+		s.Assert().Equal(reqErr.statusCode, http.StatusNotFound)
 		s.Assert().Nil(fetchedAccount)
 	})
 

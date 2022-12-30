@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -59,17 +58,7 @@ func (c *Client) CreateAccount(ctx context.Context, accountData *models.CreateAc
 		return nil
 	}
 
-	if res.StatusCode >= 400 {
-		responseBody, err := io.ReadAll(res.Body)
-		if err != nil {
-			return fmt.Errorf("failed to read response body: %w", err)
-		}
-		var errResponseBody ErrResponseBody
-		err = json.Unmarshal(responseBody, &errResponseBody)
-		return NewRequestErr(400, errors.New(errResponseBody.ErrorMessage))
-	}
-
-	return nil
+	return c.reqErrFromResponse(res)
 }
 
 func (c *Client) FetchAccount(ctx context.Context, accountID string) (account *models.AccountResponse, err error) {
@@ -87,7 +76,7 @@ func (c *Client) FetchAccount(ctx context.Context, accountID string) (account *m
 		c.logger.Error("failed to fetch an account", zap.Error(err), zap.String("accountID", accountID))
 	}
 
-	if res.StatusCode == http.StatusOK {
+	if res.StatusCode >= 200 && res.StatusCode < 300 {
 		body, err := io.ReadAll(res.Body)
 		defer func() {
 			if errClose := res.Body.Close(); errClose != nil {
@@ -104,10 +93,8 @@ func (c *Client) FetchAccount(ctx context.Context, accountID string) (account *m
 		}
 		return &account, nil
 	}
-	if res.StatusCode == http.StatusNotFound {
-		return nil, NewRequestErr(http.StatusNotFound, errors.New(fmt.Sprintf("can't find account with id %s", accountID)))
-	}
-	return nil, nil
+
+	return nil, c.reqErrFromResponse(res)
 }
 
 func (c *Client) DeleteAccount(ctx context.Context, accountID string, version int64) error {
@@ -125,19 +112,14 @@ func (c *Client) DeleteAccount(ctx context.Context, accountID string, version in
 	if err != nil {
 		c.logger.Error("failed to delete an account", zap.Error(err), zap.String("accountID", accountID))
 	}
+	// TODO: handle close errors
 	defer res.Body.Close()
 
 	if res.StatusCode >= 200 && res.StatusCode < 300 {
 		return nil
 	}
 
-	responseBody, err := io.ReadAll(res.Body)
-	if err != nil {
-		return fmt.Errorf("failed to read response body: %w", err)
-	}
-	var errResponseBody ErrResponseBody
-	err = json.Unmarshal(responseBody, &errResponseBody)
-	return NewRequestErr(res.StatusCode, errors.New(errResponseBody.ErrorMessage))
+	return c.reqErrFromResponse(res)
 }
 
 func NewAccountsClient(baseURL string) *Client {
