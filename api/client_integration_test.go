@@ -5,6 +5,7 @@ package api
 
 import (
 	"context"
+	"net/http"
 	"testing"
 
 	"github.com/arturskrzydlo/account-api-client/api/internal/models"
@@ -41,7 +42,7 @@ func (s *accountApiClientSuite) TestCreateAccount() {
 		s.assertCreatedAccount(account.Data, fetchedAccount.Data)
 	})
 
-	s.Run("should fail creating an account when one of the request param is invalid", func() {
+	s.Run("should return error when account creation fails", func() {
 		// given
 		account := createAccountRequest()
 		account.Data.Attributes.Country = nil
@@ -74,6 +75,20 @@ func (s *accountApiClientSuite) TestFetchAccount() {
 		s.Assert().NoError(err)
 		s.Assert().NoError(err)
 		s.assertCreatedAccount(account.Data, fetchedAccount.Data)
+	})
+
+	s.Run("should return error when there is no account for given accountID", func() {
+		// given
+		accountID := uuid.New().String()
+
+		// when
+		fetchedAccount, err := s.accountApiClient.FetchAccount(context.Background(), accountID)
+
+		// then
+		s.Assert().Nil(fetchedAccount)
+		var reqErr *RequestError
+		s.Assert().ErrorAs(err, &reqErr)
+		s.Assert().Equal(reqErr.statusCode, http.StatusNotFound)
 	})
 }
 
