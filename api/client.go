@@ -131,7 +131,13 @@ func (c *Client) DeleteAccount(ctx context.Context, accountID string, version in
 		return nil
 	}
 
-	return nil
+	responseBody, err := io.ReadAll(res.Body)
+	if err != nil {
+		return fmt.Errorf("failed to read response body: %w", err)
+	}
+	var errResponseBody ErrResponseBody
+	err = json.Unmarshal(responseBody, &errResponseBody)
+	return NewRequestErr(res.StatusCode, errors.New(errResponseBody.ErrorMessage))
 }
 
 func NewAccountsClient(baseURL string) *Client {

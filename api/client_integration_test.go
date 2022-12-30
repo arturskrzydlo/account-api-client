@@ -108,6 +108,21 @@ func (s *accountApiClientSuite) TestDeleteAccount() {
 		s.Require().NoError(err)
 		s.Assert().Nil(fetchedAccount)
 	})
+
+	s.Run("should return error with status code when it was not possible to delete account", func() {
+		// given
+		accountID := uuid.New().String()
+		accountVersion := int64(0)
+
+		// when
+		err := s.accountApiClient.DeleteAccount(context.Background(), accountID, accountVersion)
+
+		// then
+		var reqErr *RequestError
+		s.Assert().ErrorAs(err, &reqErr)
+		s.Assert().Equal(reqErr.statusCode, http.StatusNotFound)
+		s.Assert().Empty(reqErr.errMsg)
+	})
 }
 
 func createAccountRequest() *models.CreateAccountRequest {
