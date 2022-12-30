@@ -40,6 +40,24 @@ func (s *accountApiClientSuite) TestCreateAccount() {
 		s.Assert().NoError(err)
 		s.assertCreatedAccount(account.Data, fetchedAccount.Data)
 	})
+
+	s.Run("should fail creating an account when one of the request param is invalid", func() {
+		// given
+		account := createAccountRequest()
+		account.Data.Attributes.Country = nil
+
+		// when
+		err := s.accountApiClient.CreateAccount(context.Background(), account)
+
+		// then
+		var reqErr *RequestError
+		s.Assert().ErrorAs(err, &reqErr)
+		s.Assert().Equal(reqErr.statusCode, 400)
+		s.Assert().NotEmpty(reqErr.errMsg)
+		_, err = s.accountApiClient.FetchAccount(context.Background(), account.Data.ID)
+		s.Assert().ErrorAs(err, &reqErr)
+		s.Assert().Equal(reqErr.statusCode, 404)
+	})
 }
 
 func (s *accountApiClientSuite) TestFetchAccount() {

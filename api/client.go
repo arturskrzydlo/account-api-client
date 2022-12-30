@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -52,10 +53,20 @@ func (c *Client) CreateAccount(ctx context.Context, accountData *models.CreateAc
 	if err != nil {
 		c.logger.Error("failed to create a new account", zap.Error(err))
 	}
-	res.Body.Close()
+	defer res.Body.Close()
 
 	if res.StatusCode >= 200 && res.StatusCode < 300 {
 		return nil
+	}
+
+	if res.StatusCode >= 400 {
+		responseBody, err := io.ReadAll(res.Body)
+		if err != nil {
+			return fmt.Errorf("failed to read response body: %w", err)
+		}
+		var errResponseBody ErrResponseBody
+		err = json.Unmarshal(responseBody, &errResponseBody)
+		return NewRequestErr(400, errors.New(errResponseBody.ErrorMessage))
 	}
 
 	return nil
@@ -92,6 +103,9 @@ func (c *Client) FetchAccount(ctx context.Context, accountID string) (account *m
 			c.logger.Error("failed to read pca response body: ", zap.Error(err))
 		}
 		return &account, nil
+	}
+	if res.StatusCode == http.StatusNotFound {
+		return nil, NewRequestErr(http.StatusNotFound, errors.New(fmt.Sprintf("can't find account with id %s", accountID)))
 	}
 	return nil, nil
 }
