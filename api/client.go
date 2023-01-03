@@ -14,6 +14,10 @@ import (
 	"go.uber.org/zap"
 )
 
+const (
+	defaultTimeout = time.Second * 5
+)
+
 type AccountClient interface {
 	CreateAccount(ctx context.Context, accountData *models.CreateAccountRequest) error
 	FetchAccount(ctx context.Context, accountID string) (account *models.AccountResponse, err error)
@@ -59,7 +63,8 @@ func (c *Client) CreateAccount(ctx context.Context, accountData *models.CreateAc
 }
 
 func (c *Client) FetchAccount(ctx context.Context, accountID string) (account *models.AccountResponse, err error) {
-	request, err := http.NewRequest(http.MethodGet, fmt.Sprintf("%s/organisation/accounts/%s", c.baseURL, accountID), http.NoBody)
+	request, err := http.NewRequest(http.MethodGet,
+		fmt.Sprintf("%s/organisation/accounts/%s", c.baseURL, accountID), http.NoBody)
 	if err != nil {
 		c.logger.Error("failed to get accounts", zap.Error(err))
 	}
@@ -96,7 +101,8 @@ func (c *Client) FetchAccount(ctx context.Context, accountID string) (account *m
 }
 
 func (c *Client) DeleteAccount(ctx context.Context, accountID string, version int64) error {
-	request, err := http.NewRequest("DELETE", fmt.Sprintf("%s/organisation/accounts/%s?version=%d", c.baseURL, accountID, version),
+	request, err := http.NewRequest(http.MethodDelete,
+		fmt.Sprintf("%s/organisation/accounts/%s?version=%d", c.baseURL, accountID, version),
 		http.NoBody)
 	if err != nil {
 		c.logger.Error("failed to delete a new account", zap.Error(err))
@@ -128,7 +134,7 @@ func NewAccountsClient(baseURL string) (*Client, error) {
 	}
 	return &Client{
 		baseURL:    baseURL,
-		httpClient: &http.Client{Timeout: time.Second * 5},
+		httpClient: &http.Client{Timeout: defaultTimeout},
 		logger:     logger,
 	}, nil
 }

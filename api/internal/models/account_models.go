@@ -7,7 +7,8 @@ import "time"
 // more information about fields.
 
 // Account models have been separated between create request and response
-// to make it more extendable for fields which could exist in response but not in request (like created_on, modified_on dates and others)
+// to make it more extendable for fields which could exist in response
+// but not in request (like created_on, modified_on dates and others)
 
 type CreateAccountRequest struct {
 	Data *CreateAccountData `json:"data,omitempty"`

@@ -38,6 +38,9 @@ func (c *Client) reqErrFromResponse(res *http.Response) error {
 	}
 	var errResponseBody ErrResponseBody
 	err = json.Unmarshal(responseBody, &errResponseBody)
+	if err != nil {
+		return fmt.Errorf("failed to unmarshal error response: %w", err)
+	}
 	return NewRequestErr(res.StatusCode, errors.New(errResponseBody.ErrorMessage))
 }
 
