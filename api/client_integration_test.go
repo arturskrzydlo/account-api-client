@@ -1,5 +1,4 @@
 //go:build integration
-// +build integration
 
 package api
 
@@ -15,17 +14,17 @@ import (
 	"github.com/stretchr/testify/suite"
 )
 
-type accountApiClientSuite struct {
+type accountApiClientIntegrationSuite struct {
 	suite.Suite
 
 	accountApiClient *Client
 }
 
 func TestAccountApiClient(t *testing.T) {
-	suite.Run(t, &accountApiClientSuite{})
+	suite.Run(t, &accountApiClientIntegrationSuite{})
 }
 
-func (s *accountApiClientSuite) SetupSuite() {
+func (s *accountApiClientIntegrationSuite) SetupSuite() {
 	s.accountApiClient = createAccountClient()
 }
 
@@ -37,7 +36,7 @@ func createAccountClient() *Client {
 	return client
 }
 
-func (s *accountApiClientSuite) TestCreateAccount() {
+func (s *accountApiClientIntegrationSuite) TestCreateAccount() {
 	s.Run("should successfully create single account", func() {
 		// given
 		account := createAccountRequest()
@@ -85,7 +84,7 @@ func (s *accountApiClientSuite) TestCreateAccount() {
 	})
 }
 
-func (s *accountApiClientSuite) TestFetchAccount() {
+func (s *accountApiClientIntegrationSuite) TestFetchAccount() {
 	s.Run("should successfully fetch single account", func() {
 		// given
 		account := createAccountRequest()
@@ -132,7 +131,7 @@ func (s *accountApiClientSuite) TestFetchAccount() {
 	})
 }
 
-func (s *accountApiClientSuite) TestDeleteAccount() {
+func (s *accountApiClientIntegrationSuite) TestDeleteAccount() {
 	s.Run("should successfully delete single account", func() {
 		// given
 		account := createAccountRequest()
@@ -218,7 +217,7 @@ func createAccountRequest() *models.CreateAccountRequest {
 	}}
 }
 
-func (s *accountApiClientSuite) assertCreatedAccount(expectedAccount *models.CreateAccountData, actualAccount *models.AccountDataResponse) {
+func (s *accountApiClientIntegrationSuite) assertCreatedAccount(expectedAccount *models.CreateAccountData, actualAccount *models.AccountDataResponse) {
 	s.Assert().Equal(expectedAccount.ID, actualAccount.ID)
 	s.Assert().Equal(expectedAccount.Type, actualAccount.Type)
 	s.Assert().Equal(expectedAccount.Version, actualAccount.Version)
