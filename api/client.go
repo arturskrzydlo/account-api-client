@@ -37,12 +37,12 @@ type ResponseBody struct {
 func (c *Client) CreateAccount(ctx context.Context, accountData *models.CreateAccountRequest) error {
 	reqBody, err := json.Marshal(accountData)
 	if err != nil {
-		c.logger.Error("failed to serialize account body", zap.Error(err))
+		return fmt.Errorf("failed to serialize account body: %w", err)
 	}
 	request, err := http.NewRequest(http.MethodPost, fmt.Sprintf("%s/organisation/accounts", c.baseURL),
 		bytes.NewBuffer(reqBody))
 	if err != nil {
-		c.logger.Error("failed to create a new account", zap.Error(err))
+		return fmt.Errorf("failed to create a new account: %w", err)
 	}
 
 	request = request.WithContext(ctx)
@@ -66,7 +66,7 @@ func (c *Client) FetchAccount(ctx context.Context, accountID string) (account *m
 	request, err := http.NewRequest(http.MethodGet,
 		fmt.Sprintf("%s/organisation/accounts/%s", c.baseURL, accountID), http.NoBody)
 	if err != nil {
-		c.logger.Error("failed to get accounts", zap.Error(err))
+		return nil, fmt.Errorf("failed to create request to get accounts: %w", err)
 	}
 
 	request = request.WithContext(ctx)
@@ -85,14 +85,14 @@ func (c *Client) FetchAccount(ctx context.Context, accountID string) (account *m
 	}()
 
 	if res.StatusCode >= 200 && res.StatusCode < 300 {
-		body, err := io.ReadAll(res.Body)
-		if err != nil {
-			c.logger.Error("failed to read pca response body: ", zap.Error(err))
+		body, respErr := io.ReadAll(res.Body)
+		if respErr != nil {
+			return nil, fmt.Errorf("failed to read pca response body: %w", respErr)
 		}
 
 		var account models.AccountResponse
-		if err := json.Unmarshal(body, &account); err != nil {
-			c.logger.Error("failed to read pca response body: ", zap.Error(err))
+		if respErr = json.Unmarshal(body, &account); respErr != nil {
+			return nil, fmt.Errorf("failed to read pca response body: %w", respErr)
 		}
 		return &account, nil
 	}
@@ -105,7 +105,7 @@ func (c *Client) DeleteAccount(ctx context.Context, accountID string, version in
 		fmt.Sprintf("%s/organisation/accounts/%s?version=%d", c.baseURL, accountID, version),
 		http.NoBody)
 	if err != nil {
-		c.logger.Error("failed to delete a new account", zap.Error(err))
+		return fmt.Errorf("failed to delete an account: %w", err)
 	}
 
 	request = request.WithContext(ctx)
