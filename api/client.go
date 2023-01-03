@@ -90,11 +90,11 @@ func (c *Client) FetchAccount(ctx context.Context, accountID string) (account *m
 			return nil, fmt.Errorf("failed to read pca response body: %w", respErr)
 		}
 
-		var account models.AccountResponse
-		if respErr = json.Unmarshal(body, &account); respErr != nil {
+		var accountResponse models.AccountResponse
+		if respErr = json.Unmarshal(body, &accountResponse); respErr != nil {
 			return nil, fmt.Errorf("failed to read pca response body: %w", respErr)
 		}
-		return &account, nil
+		return &accountResponse, nil
 	}
 
 	return nil, c.reqErrFromResponse(res)
