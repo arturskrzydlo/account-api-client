@@ -5,6 +5,8 @@ package api
 
 import (
 	"context"
+	"errors"
+	"log"
 	"net/http"
 	"testing"
 
@@ -24,7 +26,15 @@ func TestAccountApiClient(t *testing.T) {
 }
 
 func (s *accountApiClientSuite) SetupSuite() {
-	s.accountApiClient = NewAccountsClient("http://localhost:8080/v1")
+	s.accountApiClient = createAccountClient()
+}
+
+func createAccountClient() *Client {
+	client, err := NewAccountsClient("http://localhost:8080/v1")
+	if err != nil {
+		log.Fatal("failed to create account client")
+	}
+	return client
 }
 
 func (s *accountApiClientSuite) TestCreateAccount() {
@@ -42,7 +52,7 @@ func (s *accountApiClientSuite) TestCreateAccount() {
 		s.assertCreatedAccount(account.Data, fetchedAccount.Data)
 	})
 
-	s.Run("should return error when account creation fails", func() {
+	s.Run("should not create account and return error with error code when account creation fails", func() {
 		// given
 		account := createAccountRequest()
 		account.Data.Attributes.Country = nil
@@ -58,6 +68,20 @@ func (s *accountApiClientSuite) TestCreateAccount() {
 		_, err = s.accountApiClient.FetchAccount(context.Background(), account.Data.ID)
 		s.Assert().ErrorAs(err, &reqErr)
 		s.Assert().Equal(reqErr.statusCode, 404)
+	})
+
+	s.Run("should return error without error code when there is issue with request", func() {
+		// given
+		account := createAccountRequest()
+		s.accountApiClient.baseURL = "http://localhost:9999/fake/url/v1"
+		// when
+		err := s.accountApiClient.CreateAccount(context.Background(), account)
+
+		// then
+		var reqErr *RequestError
+		s.Assert().False(errors.As(err, &reqErr))
+		s.Assert().NotNil(err)
+		s.accountApiClient = createAccountClient()
 	})
 }
 
@@ -89,6 +113,22 @@ func (s *accountApiClientSuite) TestFetchAccount() {
 		var reqErr *RequestError
 		s.Assert().ErrorAs(err, &reqErr)
 		s.Assert().Equal(reqErr.statusCode, http.StatusNotFound)
+	})
+
+	s.Run("should return error without error code when there is any issue with request", func() {
+		// given
+		accountID := uuid.New().String()
+		s.accountApiClient.baseURL = "http://localhost:9999/fake/url/v1"
+
+		// when
+		fetchedAccount, err := s.accountApiClient.FetchAccount(context.Background(), accountID)
+
+		// then
+		s.Assert().Nil(fetchedAccount)
+		var reqErr *RequestError
+		s.Assert().False(errors.As(err, &reqErr))
+		s.Assert().NotNil(err)
+		s.accountApiClient = createAccountClient()
 	})
 }
 
@@ -124,6 +164,22 @@ func (s *accountApiClientSuite) TestDeleteAccount() {
 		s.Assert().ErrorAs(err, &reqErr)
 		s.Assert().Equal(reqErr.statusCode, http.StatusNotFound)
 		s.Assert().Empty(reqErr.errMsg)
+	})
+
+	s.Run("should return error without error code when there is any issue with request", func() {
+		// given
+		accountID := uuid.New().String()
+		accountVersion := int64(0)
+		s.accountApiClient.baseURL = "http://localhost:9999/fake/url/v1"
+
+		// when
+		err := s.accountApiClient.DeleteAccount(context.Background(), accountID, accountVersion)
+
+		// then
+		var reqErr *RequestError
+		s.Assert().False(errors.As(err, &reqErr))
+		s.Assert().NotNil(err)
+		s.accountApiClient = createAccountClient()
 	})
 }
 

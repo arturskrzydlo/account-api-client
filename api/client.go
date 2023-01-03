@@ -7,14 +7,11 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"time"
 
 	"github.com/arturskrzydlo/account-api-client/api/internal/models"
 	"go.uber.org/zap"
-)
-
-const (
-	baseURLV1 = "http://localhost:8080/v1"
 )
 
 type AccountClient interface {
@@ -50,7 +47,7 @@ func (c *Client) CreateAccount(ctx context.Context, accountData *models.CreateAc
 
 	res, err := c.httpClient.Do(request)
 	if err != nil {
-		c.logger.Error("failed to create a new account", zap.Error(err))
+		return fmt.Errorf("failed to make request to an api : %w", err)
 	}
 	defer res.Body.Close()
 
@@ -73,16 +70,17 @@ func (c *Client) FetchAccount(ctx context.Context, accountID string) (account *m
 
 	res, err := c.httpClient.Do(request)
 	if err != nil {
-		c.logger.Error("failed to fetch an account", zap.Error(err), zap.String("accountID", accountID))
+		return nil, fmt.Errorf("failed to make request to an api : %w", err)
 	}
+
+	defer func() {
+		if errClose := res.Body.Close(); errClose != nil {
+			c.logger.Warn("failed to close response body", zap.Error(errClose))
+		}
+	}()
 
 	if res.StatusCode >= 200 && res.StatusCode < 300 {
 		body, err := io.ReadAll(res.Body)
-		defer func() {
-			if errClose := res.Body.Close(); errClose != nil {
-				c.logger.Warn("failed to close response body", zap.Error(errClose))
-			}
-		}()
 		if err != nil {
 			c.logger.Error("failed to read pca response body: ", zap.Error(err))
 		}
@@ -110,7 +108,7 @@ func (c *Client) DeleteAccount(ctx context.Context, accountID string, version in
 
 	res, err := c.httpClient.Do(request)
 	if err != nil {
-		c.logger.Error("failed to delete an account", zap.Error(err), zap.String("accountID", accountID))
+		return fmt.Errorf("failed to make request to an api : %w", err)
 	}
 	// TODO: handle close errors
 	defer res.Body.Close()
@@ -122,14 +120,15 @@ func (c *Client) DeleteAccount(ctx context.Context, accountID string, version in
 	return c.reqErrFromResponse(res)
 }
 
-func NewAccountsClient(baseURL string) *Client {
+func NewAccountsClient(baseURL string) (*Client, error) {
 	logger, _ := zap.NewProduction()
-	if baseURL == "" {
-		baseURL = baseURLV1
+	_, err := url.ParseRequestURI(baseURL)
+	if err != nil {
+		return nil, fmt.Errorf("invalid url provided: %w", err)
 	}
 	return &Client{
-		baseURL:    baseURLV1,
+		baseURL:    baseURL,
 		httpClient: &http.Client{Timeout: time.Second * 5},
 		logger:     logger,
-	}
+	}, nil
 }
