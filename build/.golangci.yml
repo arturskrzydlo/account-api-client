@@ -2,7 +2,7 @@ run:
   # Force golangci-lint to pass `mod=vendor` as needed.
   modules-download-mode: vendor
   # timeout for analysis, e.g. 30s, 5m, default is 1m
-  timeout: 10m
+  timeout: 1m
   # include test files or not, default is true
   tests: true
   issues-exit-code: 1

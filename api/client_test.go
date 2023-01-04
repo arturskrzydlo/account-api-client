@@ -24,6 +24,7 @@ func (s *accountAPIClientSuite) TestAccountClientCreation() {
 		s.NoError(err)
 		s.Assert().Equal(validAPIURL, client.baseURL)
 	})
+
 	s.Run("should not create client and return error when baseURL param is invalid URL", func() {
 		// given
 		validAPIURL := "invalidURL"

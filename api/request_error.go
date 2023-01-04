@@ -26,7 +26,7 @@ func NewRequestErr(statusCode int, err error) *RequestError {
 	}
 }
 
-func (c *Client) reqErrFromResponse(res *http.Response) error {
+func (c *client) reqErrFromResponse(res *http.Response) error {
 	responseBody, err := io.ReadAll(res.Body)
 	defer func() {
 		if errClose := res.Body.Close(); errClose != nil {

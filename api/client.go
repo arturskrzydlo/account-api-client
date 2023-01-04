@@ -24,7 +24,7 @@ type AccountClient interface {
 	DeleteAccount(ctx context.Context, accountID string, version int64) error
 }
 
-type Client struct {
+type client struct {
 	baseURL    string
 	logger     *zap.Logger
 	httpClient *http.Client
@@ -34,7 +34,7 @@ type ResponseBody struct {
 	ErrorMessage string `json:"error_message"`
 }
 
-func (c *Client) CreateAccount(ctx context.Context, accountData *models.CreateAccountRequest) error {
+func (c *client) CreateAccount(ctx context.Context, accountData *models.CreateAccountRequest) error {
 	reqBody, err := json.Marshal(accountData)
 	if err != nil {
 		return fmt.Errorf("failed to serialize account body: %w", err)
@@ -62,7 +62,7 @@ func (c *Client) CreateAccount(ctx context.Context, accountData *models.CreateAc
 	return c.reqErrFromResponse(res)
 }
 
-func (c *Client) FetchAccount(ctx context.Context, accountID string) (account *models.AccountResponse, err error) {
+func (c *client) FetchAccount(ctx context.Context, accountID string) (account *models.AccountResponse, err error) {
 	request, err := http.NewRequest(http.MethodGet,
 		fmt.Sprintf("%s/organisation/accounts/%s", c.baseURL, accountID), http.NoBody)
 	if err != nil {
@@ -100,7 +100,7 @@ func (c *Client) FetchAccount(ctx context.Context, accountID string) (account *m
 	return nil, c.reqErrFromResponse(res)
 }
 
-func (c *Client) DeleteAccount(ctx context.Context, accountID string, version int64) error {
+func (c *client) DeleteAccount(ctx context.Context, accountID string, version int64) error {
 	request, err := http.NewRequest(http.MethodDelete,
 		fmt.Sprintf("%s/organisation/accounts/%s?version=%d", c.baseURL, accountID, version),
 		http.NoBody)
@@ -126,13 +126,13 @@ func (c *Client) DeleteAccount(ctx context.Context, accountID string, version in
 	return c.reqErrFromResponse(res)
 }
 
-func NewAccountsClient(baseURL string) (*Client, error) {
+func NewAccountsClient(baseURL string) (*client, error) {
 	logger, _ := zap.NewProduction()
 	_, err := url.ParseRequestURI(baseURL)
 	if err != nil {
 		return nil, fmt.Errorf("invalid url provided: %w", err)
 	}
-	return &Client{
+	return &client{
 		baseURL:    baseURL,
 		httpClient: &http.Client{Timeout: defaultTimeout},
 		logger:     logger,

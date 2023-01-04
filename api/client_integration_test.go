@@ -17,7 +17,7 @@ import (
 type accountApiClientIntegrationSuite struct {
 	suite.Suite
 
-	accountApiClient *Client
+	accountApiClient *client
 }
 
 func TestAccountApiClient(t *testing.T) {
@@ -28,7 +28,7 @@ func (s *accountApiClientIntegrationSuite) SetupSuite() {
 	s.accountApiClient = createAccountClient()
 }
 
-func createAccountClient() *Client {
+func createAccountClient() *client {
 	client, err := NewAccountsClient("http://localhost:8080/v1")
 	if err != nil {
 		log.Fatal("failed to create account client")
