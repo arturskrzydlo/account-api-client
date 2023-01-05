@@ -15,7 +15,7 @@ import (
 )
 
 const (
-	defaultTimeout = time.Second * 5
+	defaultTimeout = time.Second * 10
 )
 
 type AccountClient interface {
@@ -126,15 +126,20 @@ func (c *client) DeleteAccount(ctx context.Context, accountID string, version in
 	return c.reqErrFromResponse(res)
 }
 
-func NewAccountsClient(baseURL string) (*client, error) {
+func NewAccountsClient(baseURL string, httpClient *http.Client) (*client, error) {
 	logger, _ := zap.NewProduction()
 	_, err := url.ParseRequestURI(baseURL)
 	if err != nil {
 		return nil, fmt.Errorf("invalid url provided: %w", err)
 	}
+
+	if httpClient == nil {
+		httpClient = &http.Client{Timeout: defaultTimeout}
+	}
+
 	return &client{
 		baseURL:    baseURL,
-		httpClient: &http.Client{Timeout: defaultTimeout},
+		httpClient: httpClient,
 		logger:     logger,
 	}, nil
 }

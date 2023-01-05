@@ -29,7 +29,7 @@ func (s *accountApiClientIntegrationSuite) SetupSuite() {
 }
 
 func createAccountClient() *client {
-	client, err := NewAccountsClient("http://localhost:8080/v1")
+	client, err := NewAccountsClient("http://localhost:8080/v1", nil)
 	if err != nil {
 		log.Fatal("failed to create account client")
 	}
