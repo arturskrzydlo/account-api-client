@@ -96,7 +96,6 @@ func (s *accountApiClientIntegrationSuite) TestFetchAccount() {
 
 		// then
 		s.Assert().NoError(err)
-		s.Assert().NoError(err)
 		s.assertCreatedAccount(account.Data, fetchedAccount.Data)
 	})
 

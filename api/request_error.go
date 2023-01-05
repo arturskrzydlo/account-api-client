@@ -39,7 +39,11 @@ func (c *client) reqErrFromResponse(res *http.Response) error {
 	var errResponseBody ErrResponseBody
 	err = json.Unmarshal(responseBody, &errResponseBody)
 	if err != nil {
-		return fmt.Errorf("failed to unmarshal error response: %w", err)
+		// in case when error message is not in defined format try to get whole response as a string
+		// I've noticed that there are differences in api and returned format i.e between 400 and 403.
+		// Also when there is no body like for 404 we should be able to still return
+		// requestErr but with empty error message
+		return NewRequestErr(res.StatusCode, errors.New(string(responseBody)))
 	}
 	return NewRequestErr(res.StatusCode, errors.New(errResponseBody.ErrorMessage))
 }
