@@ -16,6 +16,7 @@ setup: ## Setting up local env
 	cd $(GOBIN)
 	wget -O- -nv https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s v1.50.1
 
+
 .PHONY: clean
 clean: ## Remove build artifacts.
 	rm -rf $(GOBIN)
@@ -24,8 +25,12 @@ clean: ## Remove build artifacts.
 lint: ## Lint the source code.
 	$(GOBIN)/golangci-lint run --config $(shell pwd)/build/.golangci.yml --verbose ./...
 
-.PHONY: integration-test
-integration-test: ## Run all integration tests
+.PHONY: prepare-integration-tests
+prepare-integration-tests: ## Run fake account api server
+	docker-compose -f docker-compose-fake-api.yml --project-name fake-account-api up --detach --remove-orphans
+
+.PHONY: all-tests
+all-tests: ## Run all test (unit + integration)
 	$(GO) test -v -tags=integration ./...
 
 .PHONY: cover
