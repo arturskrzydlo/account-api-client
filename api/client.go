@@ -16,6 +16,7 @@ import (
 
 const (
 	defaultTimeout = time.Second * 10
+	jsonType       = "application/json"
 )
 
 type AccountClient interface {
@@ -43,76 +44,30 @@ func (c *client) CreateAccount(ctx context.Context, accountData *models.CreateAc
 	request, err := http.NewRequest(http.MethodPost, fmt.Sprintf("%s/organisation/accounts", c.baseURL),
 		bytes.NewBuffer(reqBody))
 	if err != nil {
-		return fmt.Errorf("failed to create a new account: %w", err)
+		return fmt.Errorf("failed to create a request to create a new account: %w", err)
 	}
 
-	request = request.WithContext(ctx)
-	request.Header.Set("content-type", "application/json")
-	request.Header.Set("Accept", "application/json")
-
-	var res *http.Response
-
-	res, err = retry(c.retryPolicy, func() (*http.Response, error) {
-		res, err = c.httpClient.Do(request)
-		if err != nil {
-			return nil, fmt.Errorf("failed to make request to an api : %w", err)
-		}
-		return res, nil
-	})
+	err = c.sendRequest(ctx, request, nil)
 	if err != nil {
-		return err
-	}
-	defer res.Body.Close()
-
-	if res.StatusCode >= 200 && res.StatusCode < 300 {
-		return nil
+		return fmt.Errorf("failed to send create account request: %w", err)
 	}
 
-	return c.reqErrFromResponse(res)
+	return nil
 }
 
 func (c *client) FetchAccount(ctx context.Context, accountID string) (account *models.AccountResponse, err error) {
 	request, err := http.NewRequest(http.MethodGet,
 		fmt.Sprintf("%s/organisation/accounts/%s", c.baseURL, accountID), http.NoBody)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create request to get accounts: %w", err)
+		return nil, fmt.Errorf("failed to create fetche account request: %w", err)
 	}
 
-	request = request.WithContext(ctx)
-	request.Header.Set("content-type", "application/json")
-	request.Header.Set("Accept", "application/json")
-
-	res, err := retry(c.retryPolicy, func() (*http.Response, error) {
-		res, reqErr := c.httpClient.Do(request)
-		if reqErr != nil {
-			return nil, fmt.Errorf("failed to make request to an api : %w", reqErr)
-		}
-
-		return res, nil
-	})
+	var accountResponse models.AccountResponse
+	err = c.sendRequest(ctx, request, &accountResponse)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to send fetch account request: %w", err)
 	}
-	defer func() {
-		if errClose := res.Body.Close(); errClose != nil {
-			c.logger.Warn("failed to close response body", zap.Error(errClose))
-		}
-	}()
-
-	if res.StatusCode >= 200 && res.StatusCode < 300 {
-		body, respErr := io.ReadAll(res.Body)
-		if respErr != nil {
-			return nil, fmt.Errorf("failed to read pca response body: %w", respErr)
-		}
-
-		var accountResponse models.AccountResponse
-		if respErr = json.Unmarshal(body, &accountResponse); respErr != nil {
-			return nil, fmt.Errorf("failed to read pca response body: %w", respErr)
-		}
-		return &accountResponse, nil
-	}
-
-	return nil, c.reqErrFromResponse(res)
+	return &accountResponse, nil
 }
 
 func (c *client) DeleteAccount(ctx context.Context, accountID string, version int64) error {
@@ -120,31 +75,64 @@ func (c *client) DeleteAccount(ctx context.Context, accountID string, version in
 		fmt.Sprintf("%s/organisation/accounts/%s?version=%d", c.baseURL, accountID, version),
 		http.NoBody)
 	if err != nil {
-		return fmt.Errorf("failed to delete an account: %w", err)
+		return fmt.Errorf("failed to create delete account request: %w", err)
 	}
 
+	err = c.sendRequest(ctx, request, nil)
+	if err != nil {
+		return fmt.Errorf("failed to send delete account request: %w", err)
+	}
+
+	return nil
+}
+
+func (c *client) sendRequest(ctx context.Context, request *http.Request, result interface{}) error {
 	request = request.WithContext(ctx)
-	request.Header.Set("content-type", "application/json")
-	request.Header.Set("Accept", "application/json")
+	setContentType(request)
 
 	res, err := retry(c.retryPolicy, func() (*http.Response, error) {
-		res, reqErr := c.httpClient.Do(request)
-		if reqErr != nil {
-			return nil, fmt.Errorf("failed to make request to an api : %w", reqErr)
+		res, err := c.httpClient.Do(request)
+		if err != nil {
+			return nil, fmt.Errorf("failed to make request to an api : %w", err)
 		}
+
 		return res, nil
 	})
 	if err != nil {
-		return err
-	}
-	// TODO: handle close errors
-	defer res.Body.Close()
-
-	if res.StatusCode >= 200 && res.StatusCode < 300 {
-		return nil
+		return fmt.Errorf("failed to send request : %w", err)
 	}
 
-	return c.reqErrFromResponse(res)
+	defer func() {
+		if errClose := res.Body.Close(); errClose != nil {
+			c.logger.Warn("failed to close response body", zap.Error(errClose))
+		}
+	}()
+
+	resBody, err := io.ReadAll(res.Body)
+	if err != nil {
+		return fmt.Errorf("failed to read response body: %w", err)
+	}
+
+	if res.StatusCode >= http.StatusBadRequest {
+		return c.reqErrFromResponse(resBody, res.StatusCode)
+	}
+
+	if result != nil {
+		if err = json.Unmarshal(resBody, result); err != nil {
+			return fmt.Errorf("failed to unmarshall response body: %w", err)
+		}
+	}
+
+	return nil
+}
+
+func setContentType(req *http.Request) string {
+	contentType := req.Header.Get("Content-Type")
+	if contentType == "" {
+		req.Header.Set("Content-Type", jsonType)
+		contentType = jsonType
+	}
+	return contentType
 }
 
 func NewAccountsClient(baseURL string, httpClient *http.Client, retryPolicy RetryPolicy) (*client, error) {
