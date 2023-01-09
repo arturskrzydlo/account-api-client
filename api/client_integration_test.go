@@ -5,8 +5,10 @@ package api
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log"
 	"net/http"
+	"os"
 	"testing"
 
 	"github.com/arturskrzydlo/account-api-client/api/internal/models"
@@ -29,7 +31,8 @@ func (s *accountApiClientIntegrationSuite) SetupSuite() {
 }
 
 func createAccountClient() *client {
-	accountApiClient, err := NewAccountsClient("http://account-api:8080/v1", nil)
+	hostname := os.Getenv("ACCOUNT_API_HOSTNAME")
+	accountApiClient, err := NewAccountsClient(fmt.Sprintf("http://%s:8080/v1", hostname), nil, nil)
 	if err != nil {
 		log.Fatal("failed to create account accountApiClient")
 	}

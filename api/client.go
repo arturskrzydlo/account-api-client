@@ -25,9 +25,10 @@ type AccountClient interface {
 }
 
 type client struct {
-	baseURL    string
-	logger     *zap.Logger
-	httpClient *http.Client
+	baseURL     string
+	logger      *zap.Logger
+	httpClient  *http.Client
+	retryPolicy RetryPolicy
 }
 
 type ResponseBody struct {
@@ -49,9 +50,17 @@ func (c *client) CreateAccount(ctx context.Context, accountData *models.CreateAc
 	request.Header.Set("content-type", "application/json")
 	request.Header.Set("Accept", "application/json")
 
-	res, err := c.httpClient.Do(request)
+	var res *http.Response
+
+	res, err = retry(c.retryPolicy, func() (*http.Response, error) {
+		res, err = c.httpClient.Do(request)
+		if err != nil {
+			return nil, fmt.Errorf("failed to make request to an api : %w", err)
+		}
+		return res, nil
+	})
 	if err != nil {
-		return fmt.Errorf("failed to make request to an api : %w", err)
+		return err
 	}
 	defer res.Body.Close()
 
@@ -73,11 +82,17 @@ func (c *client) FetchAccount(ctx context.Context, accountID string) (account *m
 	request.Header.Set("content-type", "application/json")
 	request.Header.Set("Accept", "application/json")
 
-	res, err := c.httpClient.Do(request)
-	if err != nil {
-		return nil, fmt.Errorf("failed to make request to an api : %w", err)
-	}
+	res, err := retry(c.retryPolicy, func() (*http.Response, error) {
+		res, reqErr := c.httpClient.Do(request)
+		if reqErr != nil {
+			return nil, fmt.Errorf("failed to make request to an api : %w", reqErr)
+		}
 
+		return res, nil
+	})
+	if err != nil {
+		return nil, err
+	}
 	defer func() {
 		if errClose := res.Body.Close(); errClose != nil {
 			c.logger.Warn("failed to close response body", zap.Error(errClose))
@@ -112,9 +127,15 @@ func (c *client) DeleteAccount(ctx context.Context, accountID string, version in
 	request.Header.Set("content-type", "application/json")
 	request.Header.Set("Accept", "application/json")
 
-	res, err := c.httpClient.Do(request)
+	res, err := retry(c.retryPolicy, func() (*http.Response, error) {
+		res, reqErr := c.httpClient.Do(request)
+		if reqErr != nil {
+			return nil, fmt.Errorf("failed to make request to an api : %w", reqErr)
+		}
+		return res, nil
+	})
 	if err != nil {
-		return fmt.Errorf("failed to make request to an api : %w", err)
+		return err
 	}
 	// TODO: handle close errors
 	defer res.Body.Close()
@@ -126,7 +147,7 @@ func (c *client) DeleteAccount(ctx context.Context, accountID string, version in
 	return c.reqErrFromResponse(res)
 }
 
-func NewAccountsClient(baseURL string, httpClient *http.Client) (*client, error) {
+func NewAccountsClient(baseURL string, httpClient *http.Client, retryPolicy RetryPolicy) (*client, error) {
 	logger, _ := zap.NewProduction()
 	_, err := url.ParseRequestURI(baseURL)
 	if err != nil {
@@ -137,9 +158,14 @@ func NewAccountsClient(baseURL string, httpClient *http.Client) (*client, error)
 		httpClient = &http.Client{Timeout: defaultTimeout}
 	}
 
+	if retryPolicy == nil {
+		retryPolicy = DefaultRetryPolicy{}
+	}
+
 	return &client{
-		baseURL:    baseURL,
-		httpClient: httpClient,
-		logger:     logger,
+		baseURL:     baseURL,
+		httpClient:  httpClient,
+		logger:      logger,
+		retryPolicy: retryPolicy,
 	}, nil
 }
