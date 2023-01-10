@@ -8,6 +8,7 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"testing"
+	"time"
 
 	"github.com/arturskrzydlo/account-api-client/api/internal/models"
 	"github.com/stretchr/testify/suite"
@@ -179,5 +180,64 @@ func (s *accountAPIClientSuite) TestRetryPolicies() {
 				s.Assert().Equal(tc.retry, shouldRetry)
 			})
 		}
+	})
+}
+
+func (s *accountAPIClientSuite) TestBackoffStrategies() {
+	// these test is a bit brittle - it can be changed to use clock library https://github.com/benbjohnson/clock and time-consuming
+	// to not make test last to long and dependent on the machine performance
+	// it would require to add clock var and use it across client
+	s.Run("client should apply backoff strategy to retry", func() {
+		// given
+		numCalls := 0
+		testServ := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusInternalServerError)
+			numCalls++
+		}))
+
+		delay := time.Millisecond * 1
+		maxRetries := 3
+		multiplier := 10
+		accountsClient, err := NewAccountsClient(testServ.URL, WithRetriesOnDefaultRetryPolicy(maxRetries), WithExponentialBackoffStrategy(delay, multiplier))
+		s.Assert().NoError(err)
+
+		// when
+		startTime := time.Now()
+		_, err = accountsClient.FetchAccount(context.Background(), "account-id")
+		endTime := time.Now()
+
+		// then
+		s.Assert().True(endTime.Sub(startTime) > delay+(delay*time.Duration(multiplier))+delay*time.Duration(multiplier)*time.Duration(multiplier))
+	})
+
+	s.Run("should increase exponentially delay between retries", func() {
+		// given
+		backoff := ExponentialBackoffStrategy{
+			initialDelay: time.Millisecond * 10,
+			multiplier:   10,
+		}
+
+		// when
+		var delay time.Duration
+		for i := 0; i < 3; i++ {
+			delay = backoff.delay()
+		}
+
+		// then
+		s.Assert().Equal(time.Second, delay)
+	})
+
+	s.Run("should return linear delay between retries", func() {
+		// given
+		backoff := LinearBackoffStrategy{
+			delayTime: time.Millisecond * 100,
+		}
+
+		// when
+		delay := backoff.delay()
+
+		// then
+		s.Assert().Equal(backoff.delayTime, delay)
 	})
 }

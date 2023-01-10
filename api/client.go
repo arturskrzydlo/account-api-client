@@ -26,10 +26,11 @@ type AccountClient interface {
 }
 
 type client struct {
-	baseURL     string
-	logger      *zap.Logger
-	httpClient  *http.Client
-	retryPolicy RetryPolicy
+	baseURL         string
+	logger          *zap.Logger
+	httpClient      *http.Client
+	retryPolicy     RetryPolicy
+	backoffStrategy BackOffStrategy
 }
 
 func NewAccountsClient(baseURL string, options ...ClientOption) (*client, error) {
@@ -41,8 +42,9 @@ func NewAccountsClient(baseURL string, options ...ClientOption) (*client, error)
 
 	// default client config
 	cfg := clientConfig{
-		httpClient:  &http.Client{Timeout: defaultTimeout},
-		retryPolicy: DefaultRetryPolicy{},
+		httpClient:      &http.Client{Timeout: defaultTimeout},
+		retryPolicy:     DefaultRetryPolicy{MaxRetries: 0},
+		backoffStrategy: NoBackoffStrategy{},
 	}
 
 	for _, option := range options {
@@ -50,18 +52,20 @@ func NewAccountsClient(baseURL string, options ...ClientOption) (*client, error)
 	}
 
 	return &client{
-		baseURL:     baseURL,
-		httpClient:  cfg.httpClient,
-		logger:      logger,
-		retryPolicy: cfg.retryPolicy,
+		baseURL:         baseURL,
+		httpClient:      cfg.httpClient,
+		logger:          logger,
+		retryPolicy:     cfg.retryPolicy,
+		backoffStrategy: cfg.backoffStrategy,
 	}, nil
 }
 
 type ClientOption func(config *clientConfig)
 
 type clientConfig struct {
-	httpClient  *http.Client
-	retryPolicy RetryPolicy
+	httpClient      *http.Client
+	retryPolicy     RetryPolicy
+	backoffStrategy BackOffStrategy
 }
 
 func WithRetriesOnDefaultRetryPolicy(maxRetries int) ClientOption {
@@ -73,6 +77,22 @@ func WithRetriesOnDefaultRetryPolicy(maxRetries int) ClientOption {
 func WithCustomHttpClient(httpClient *http.Client) ClientOption {
 	return func(cfg *clientConfig) {
 		cfg.httpClient = httpClient
+	}
+}
+
+func WithExponentialBackoffStrategy(initialDelay time.Duration, multiplier int) ClientOption {
+	return func(cfg *clientConfig) {
+		cfg.backoffStrategy = &ExponentialBackoffStrategy{
+			initialDelay: initialDelay,
+			retryCount:   0,
+			multiplier:   multiplier,
+		}
+	}
+}
+
+func WithLinearBackoffStrategy(delay time.Duration) ClientOption {
+	return func(cfg *clientConfig) {
+		cfg.backoffStrategy = LinearBackoffStrategy{delayTime: delay}
 	}
 }
 
@@ -134,7 +154,7 @@ func (c *client) sendRequest(ctx context.Context, request *http.Request, result 
 	request = request.WithContext(ctx)
 	setContentType(request)
 
-	res, err := retry(c.retryPolicy, func() (*http.Response, error) {
+	res, err := retry(c.retryPolicy, c.backoffStrategy, func() (*http.Response, error) {
 		res, err := c.httpClient.Do(request)
 		if err != nil {
 			return nil, fmt.Errorf("failed to make request to an api : %w", err)
