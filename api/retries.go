@@ -14,7 +14,7 @@ type RetryPolicy interface {
 }
 
 type BackOffStrategy interface {
-	delay() time.Duration
+	delay(retryCount int) time.Duration
 }
 
 type DefaultRetryPolicy struct {
@@ -23,7 +23,7 @@ type DefaultRetryPolicy struct {
 
 type NoBackoffStrategy struct{}
 
-func (n NoBackoffStrategy) delay() time.Duration {
+func (n NoBackoffStrategy) delay(retryCount int) time.Duration {
 	return 0
 }
 
@@ -31,7 +31,7 @@ type LinearBackoffStrategy struct {
 	delayTime time.Duration
 }
 
-func (l LinearBackoffStrategy) delay() time.Duration {
+func (l LinearBackoffStrategy) delay(retryCount int) time.Duration {
 	return l.delayTime
 }
 
@@ -41,13 +41,11 @@ func (mrp DefaultRetryPolicy) NumberOfRetries() int {
 
 type ExponentialBackoffStrategy struct {
 	initialDelay time.Duration
-	retryCount   int
 	multiplier   int
 }
 
-func (e *ExponentialBackoffStrategy) delay() time.Duration {
-	multiplier := math.Pow(float64(e.multiplier), float64(e.retryCount))
-	e.retryCount++
+func (e ExponentialBackoffStrategy) delay(retryCount int) time.Duration {
+	multiplier := math.Pow(float64(e.multiplier), float64(retryCount))
 	return e.initialDelay * time.Duration(multiplier)
 }
 
@@ -73,19 +71,20 @@ func (mrp DefaultRetryPolicy) ShouldRetry(err error, response *http.Response) bo
 }
 
 func retry(retryPolicy RetryPolicy, backoff BackOffStrategy, fn func() (*http.Response, error)) (*http.Response, error) {
-	retriesLeft := retryPolicy.NumberOfRetries()
+	maxRetries := retryPolicy.NumberOfRetries()
+	retriesCount := 0
 	res, err := fn()
 	for {
 		if !retryPolicy.ShouldRetry(err, res) {
 			break
 		}
-		if retriesLeft == 0 {
+		if retriesCount == maxRetries {
 			return res, err
 		}
 
-		time.Sleep(backoff.delay())
+		time.Sleep(backoff.delay(retriesCount))
 		res, err = fn()
-		retriesLeft--
+		retriesCount++
 	}
 	return res, err
 }

@@ -104,7 +104,6 @@ func (s *accountAPIClientSuite) TestRetryPolicies() {
 		maxRetries := 2
 		numCalls := 0
 		testServ := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			// there should be three calls - initial one, one with first retry,
 			if numCalls < maxRetries-1 {
 				w.Header().Set("Content-Type", "application/json")
 				w.WriteHeader(http.StatusInternalServerError)
@@ -184,16 +183,14 @@ func (s *accountAPIClientSuite) TestRetryPolicies() {
 }
 
 func (s *accountAPIClientSuite) TestBackoffStrategies() {
-	// these test is a bit brittle - it can be changed to use clock library https://github.com/benbjohnson/clock and time-consuming
+	// these tests are a bit brittle - it can be changed to use clock library https://github.com/benbjohnson/clock and time-consuming
 	// to not make test last to long and dependent on the machine performance
 	// it would require to add clock var and use it across client
 	s.Run("client should apply backoff strategy to retry", func() {
 		// given
-		numCalls := 0
 		testServ := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusInternalServerError)
-			numCalls++
 		}))
 
 		delay := time.Millisecond * 1
@@ -211,6 +208,31 @@ func (s *accountAPIClientSuite) TestBackoffStrategies() {
 		s.Assert().True(endTime.Sub(startTime) > delay+(delay*time.Duration(multiplier))+delay*time.Duration(multiplier)*time.Duration(multiplier))
 	})
 
+	s.Run("applied backoff strategy should be reusable, so it should use the same strategy with initial values", func() {
+		// given
+		testServ := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusInternalServerError)
+		}))
+
+		delay := time.Millisecond * 1
+		maxRetries := 3
+		multiplier := 10
+		accountsClient, err := NewAccountsClient(testServ.URL, WithRetriesOnDefaultRetryPolicy(maxRetries), WithExponentialBackoffStrategy(delay, multiplier))
+		s.Assert().NoError(err)
+
+		_, err = accountsClient.FetchAccount(context.Background(), "account-id")
+
+		// when
+		startTime := time.Now()
+		err = accountsClient.DeleteAccount(context.Background(), "account-id", 0)
+		endTime := time.Now()
+
+		// then
+		s.Assert().True(endTime.Sub(startTime) > delay+(delay*time.Duration(multiplier))+delay*time.Duration(multiplier)*time.Duration(multiplier))
+		s.Assert().True(endTime.Sub(startTime) < time.Second*10)
+	})
+
 	s.Run("should increase exponentially delay between retries", func() {
 		// given
 		backoff := ExponentialBackoffStrategy{
@@ -221,7 +243,7 @@ func (s *accountAPIClientSuite) TestBackoffStrategies() {
 		// when
 		var delay time.Duration
 		for i := 0; i < 3; i++ {
-			delay = backoff.delay()
+			delay = backoff.delay(i)
 		}
 
 		// then
@@ -235,7 +257,7 @@ func (s *accountAPIClientSuite) TestBackoffStrategies() {
 		}
 
 		// when
-		delay := backoff.delay()
+		delay := backoff.delay(0)
 
 		// then
 		s.Assert().Equal(backoff.delayTime, delay)

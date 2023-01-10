@@ -84,7 +84,6 @@ func WithExponentialBackoffStrategy(initialDelay time.Duration, multiplier int) 
 	return func(cfg *clientConfig) {
 		cfg.backoffStrategy = &ExponentialBackoffStrategy{
 			initialDelay: initialDelay,
-			retryCount:   0,
 			multiplier:   multiplier,
 		}
 	}
