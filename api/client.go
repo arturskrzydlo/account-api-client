@@ -32,6 +32,50 @@ type client struct {
 	retryPolicy RetryPolicy
 }
 
+func NewAccountsClient(baseURL string, options ...ClientOption) (*client, error) {
+	logger, _ := zap.NewProduction()
+	_, err := url.ParseRequestURI(baseURL)
+	if err != nil {
+		return nil, fmt.Errorf("invalid url provided: %w", err)
+	}
+
+	// default client config
+	cfg := clientConfig{
+		httpClient:  &http.Client{Timeout: defaultTimeout},
+		retryPolicy: DefaultRetryPolicy{},
+	}
+
+	for _, option := range options {
+		option(&cfg)
+	}
+
+	return &client{
+		baseURL:     baseURL,
+		httpClient:  cfg.httpClient,
+		logger:      logger,
+		retryPolicy: cfg.retryPolicy,
+	}, nil
+}
+
+type ClientOption func(config *clientConfig)
+
+type clientConfig struct {
+	httpClient  *http.Client
+	retryPolicy RetryPolicy
+}
+
+func WithRetriesOnDefaultRetryPolicy(maxRetries int) ClientOption {
+	return func(cfg *clientConfig) {
+		cfg.retryPolicy = DefaultRetryPolicy{MaxRetries: maxRetries}
+	}
+}
+
+func WithCustomHttpClient(httpClient *http.Client) ClientOption {
+	return func(cfg *clientConfig) {
+		cfg.httpClient = httpClient
+	}
+}
+
 type ResponseBody struct {
 	ErrorMessage string `json:"error_message"`
 }
@@ -133,27 +177,4 @@ func setContentType(req *http.Request) string {
 		contentType = jsonType
 	}
 	return contentType
-}
-
-func NewAccountsClient(baseURL string, httpClient *http.Client, retryPolicy RetryPolicy) (*client, error) {
-	logger, _ := zap.NewProduction()
-	_, err := url.ParseRequestURI(baseURL)
-	if err != nil {
-		return nil, fmt.Errorf("invalid url provided: %w", err)
-	}
-
-	if httpClient == nil {
-		httpClient = &http.Client{Timeout: defaultTimeout}
-	}
-
-	if retryPolicy == nil {
-		retryPolicy = DefaultRetryPolicy{}
-	}
-
-	return &client{
-		baseURL:     baseURL,
-		httpClient:  httpClient,
-		logger:      logger,
-		retryPolicy: retryPolicy,
-	}, nil
 }

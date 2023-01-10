@@ -32,7 +32,7 @@ func (s *accountApiClientIntegrationSuite) SetupSuite() {
 
 func createAccountClient() *client {
 	hostname := os.Getenv("ACCOUNT_API_HOSTNAME")
-	accountApiClient, err := NewAccountsClient(fmt.Sprintf("http://%s:8080/v1", hostname), nil, nil)
+	accountApiClient, err := NewAccountsClient(fmt.Sprintf("http://%s:8080/v1", hostname))
 	if err != nil {
 		log.Fatal("failed to create account accountApiClient")
 	}

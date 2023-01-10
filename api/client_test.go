@@ -54,8 +54,12 @@ func (s *accountAPIClientSuite) TestAccountClientCreation() {
 
 	for name, tc := range testCases {
 		s.Run(name, func() {
+			httpClientOptions := make([]ClientOption, 0)
+			if tc.httpClient != nil {
+				httpClientOptions = append(httpClientOptions, WithCustomHttpClient(tc.httpClient))
+			}
 			// when
-			accountClient, err := NewAccountsClient(tc.apiURL, tc.httpClient, nil)
+			accountClient, err := NewAccountsClient(tc.apiURL, httpClientOptions...)
 			// then
 			if !tc.expectedErr {
 				s.NoError(err)
@@ -79,10 +83,9 @@ func (s *accountAPIClientSuite) TestRetryPolicies() {
 			w.WriteHeader(http.StatusInternalServerError)
 			numCalls++
 		}))
-		defaultRetryPolicy := &DefaultRetryPolicy{
-			MaxRetries: 3,
-		}
-		accountsClient, err := NewAccountsClient(testServ.URL, nil, defaultRetryPolicy)
+
+		maxRetries := 3
+		accountsClient, err := NewAccountsClient(testServ.URL, WithRetriesOnDefaultRetryPolicy(maxRetries))
 		s.Assert().NoError(err)
 
 		// when
@@ -92,18 +95,16 @@ func (s *accountAPIClientSuite) TestRetryPolicies() {
 		var reqErr *RequestError
 		s.Assert().True(errors.As(err, &reqErr))
 		s.Assert().Equal(http.StatusInternalServerError, reqErr.statusCode)
-		s.Assert().Equal(defaultRetryPolicy.MaxRetries+1, numCalls)
+		s.Assert().Equal(maxRetries+1, numCalls)
 	})
 
 	s.Run("client should retry request to an api according to retry policy and back to valid response after second retry", func() {
 		// given
-		defaultRetryPolicy := &DefaultRetryPolicy{
-			MaxRetries: 2,
-		}
+		maxRetries := 2
 		numCalls := 0
 		testServ := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			// there should be three calls - initial one, one with first retry,
-			if numCalls < defaultRetryPolicy.MaxRetries-1 {
+			if numCalls < maxRetries-1 {
 				w.Header().Set("Content-Type", "application/json")
 				w.WriteHeader(http.StatusInternalServerError)
 			} else {
@@ -119,7 +120,7 @@ func (s *accountAPIClientSuite) TestRetryPolicies() {
 			}
 			numCalls++
 		}))
-		accountsClient, err := NewAccountsClient(testServ.URL, nil, defaultRetryPolicy)
+		accountsClient, err := NewAccountsClient(testServ.URL, WithRetriesOnDefaultRetryPolicy(maxRetries))
 		s.Assert().NoError(err)
 
 		// when
@@ -128,7 +129,7 @@ func (s *accountAPIClientSuite) TestRetryPolicies() {
 		// then
 		s.Require().NoError(err)
 		s.Assert().NotNil(account)
-		s.Assert().Equal(defaultRetryPolicy.MaxRetries, numCalls)
+		s.Assert().Equal(maxRetries, numCalls)
 	})
 
 	s.Run("test default retry policy", func() {
