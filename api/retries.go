@@ -8,6 +8,30 @@ import (
 	"time"
 )
 
+type Retrier struct {
+	retryPolicy RetryPolicy
+	backoff     BackOffStrategy
+}
+
+func (r Retrier) retry(fn func() (*http.Response, error)) (*http.Response, error) {
+	maxRetries := r.retryPolicy.NumberOfRetries()
+	retriesCount := 0
+	res, err := fn()
+	for {
+		if !r.retryPolicy.ShouldRetry(err, res) {
+			break
+		}
+		if retriesCount == maxRetries {
+			return res, err
+		}
+
+		time.Sleep(r.backoff.delay(retriesCount))
+		res, err = fn()
+		retriesCount++
+	}
+	return res, err
+}
+
 type RetryPolicy interface {
 	ShouldRetry(err error, response *http.Response) bool
 	NumberOfRetries() int
@@ -23,7 +47,7 @@ type DefaultRetryPolicy struct {
 
 type NoBackoffStrategy struct{}
 
-func (n NoBackoffStrategy) delay(retryCount int) time.Duration {
+func (n NoBackoffStrategy) delay(_ int) time.Duration {
 	return 0
 }
 
@@ -31,7 +55,7 @@ type LinearBackoffStrategy struct {
 	delayTime time.Duration
 }
 
-func (l LinearBackoffStrategy) delay(retryCount int) time.Duration {
+func (l LinearBackoffStrategy) delay(_ int) time.Duration {
 	return l.delayTime
 }
 
@@ -68,23 +92,4 @@ func (mrp DefaultRetryPolicy) ShouldRetry(err error, response *http.Response) bo
 	}
 
 	return errFromHTTPClient || serverSideStatusCode
-}
-
-func retry(retryPolicy RetryPolicy, backoff BackOffStrategy, fn func() (*http.Response, error)) (*http.Response, error) {
-	maxRetries := retryPolicy.NumberOfRetries()
-	retriesCount := 0
-	res, err := fn()
-	for {
-		if !retryPolicy.ShouldRetry(err, res) {
-			break
-		}
-		if retriesCount == maxRetries {
-			return res, err
-		}
-
-		time.Sleep(backoff.delay(retriesCount))
-		res, err = fn()
-		retriesCount++
-	}
-	return res, err
 }

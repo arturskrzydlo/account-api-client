@@ -10,8 +10,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/arturskrzydlo/account-api-client/api/internal/models"
+	"github.com/afex/hystrix-go/hystrix"
 	"github.com/stretchr/testify/suite"
+
+	"github.com/arturskrzydlo/account-api-client/api/internal/models"
 )
 
 type accountAPIClientSuite struct {
@@ -57,7 +59,7 @@ func (s *accountAPIClientSuite) TestAccountClientCreation() {
 		s.Run(name, func() {
 			httpClientOptions := make([]ClientOption, 0)
 			if tc.httpClient != nil {
-				httpClientOptions = append(httpClientOptions, WithCustomHttpClient(tc.httpClient))
+				httpClientOptions = append(httpClientOptions, WithCustomHTTPClient(tc.httpClient))
 			}
 			// when
 			accountClient, err := NewAccountsClient(tc.apiURL, httpClientOptions...)
@@ -183,9 +185,9 @@ func (s *accountAPIClientSuite) TestRetryPolicies() {
 }
 
 func (s *accountAPIClientSuite) TestBackoffStrategies() {
-	// these tests are a bit brittle - it can be changed to use clock library https://github.com/benbjohnson/clock and time-consuming
-	// to not make test last to long and dependent on the machine performance
-	// it would require to add clock var and use it across client
+	// these tests are a bit brittle and time-consuming
+	// it can be changed to use clock library https://github.com/benbjohnson/clock
+	// to not make test last to long, it would require to add clock var and use it across client
 	s.Run("client should apply backoff strategy to retry", func() {
 		// given
 		testServ := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -196,7 +198,9 @@ func (s *accountAPIClientSuite) TestBackoffStrategies() {
 		delay := time.Millisecond * 1
 		maxRetries := 3
 		multiplier := 10
-		accountsClient, err := NewAccountsClient(testServ.URL, WithRetriesOnDefaultRetryPolicy(maxRetries), WithExponentialBackoffStrategy(delay, multiplier))
+		accountsClient, err := NewAccountsClient(testServ.URL,
+			WithRetriesOnDefaultRetryPolicy(maxRetries),
+			WithExponentialBackoffStrategy(delay, multiplier))
 		s.Assert().NoError(err)
 
 		// when
@@ -205,6 +209,7 @@ func (s *accountAPIClientSuite) TestBackoffStrategies() {
 		endTime := time.Now()
 
 		// then
+		s.Assert().Error(err)
 		s.Assert().True(endTime.Sub(startTime) > delay+(delay*time.Duration(multiplier))+delay*time.Duration(multiplier)*time.Duration(multiplier))
 	})
 
@@ -218,10 +223,13 @@ func (s *accountAPIClientSuite) TestBackoffStrategies() {
 		delay := time.Millisecond * 1
 		maxRetries := 3
 		multiplier := 10
-		accountsClient, err := NewAccountsClient(testServ.URL, WithRetriesOnDefaultRetryPolicy(maxRetries), WithExponentialBackoffStrategy(delay, multiplier))
+		accountsClient, err := NewAccountsClient(testServ.URL,
+			WithRetriesOnDefaultRetryPolicy(maxRetries),
+			WithExponentialBackoffStrategy(delay, multiplier))
 		s.Assert().NoError(err)
 
 		_, err = accountsClient.FetchAccount(context.Background(), "account-id")
+		s.Assert().Error(err)
 
 		// when
 		startTime := time.Now()
@@ -229,6 +237,7 @@ func (s *accountAPIClientSuite) TestBackoffStrategies() {
 		endTime := time.Now()
 
 		// then
+		s.Assert().Error(err)
 		s.Assert().True(endTime.Sub(startTime) > delay+(delay*time.Duration(multiplier))+delay*time.Duration(multiplier)*time.Duration(multiplier))
 		s.Assert().True(endTime.Sub(startTime) < time.Second*10)
 	})
@@ -261,5 +270,36 @@ func (s *accountAPIClientSuite) TestBackoffStrategies() {
 
 		// then
 		s.Assert().Equal(backoff.delayTime, delay)
+	})
+}
+
+func (s *accountAPIClientSuite) TestClientCircuitBreaker() {
+	s.Run("should apply circuit breaker and not make any other api requests when reached error threshold", func() {
+		// given
+		numCalls := 0
+		testServ := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			numCalls++
+			http.Error(w, "server error", http.StatusInternalServerError)
+		}))
+		accountsClient, err := NewAccountsClient(testServ.URL)
+		s.Require().NoError(err)
+
+		// circuit breaker is configured for minimum 20 error calls to be opened
+		// so there can be more calls, idea is to check that not all the calls has been made to server
+
+		// when
+		serverCalls := 40
+		for i := 0; i < serverCalls; i++ {
+			_, err = accountsClient.FetchAccount(context.Background(), "account-id")
+			s.Assert().Error(err)
+		}
+
+		_, _ = accountsClient.FetchAccount(context.Background(), "account-id")
+
+		// then
+		s.Assert().True(numCalls < serverCalls)
+
+		// cleanup
+		hystrix.Flush()
 	})
 }

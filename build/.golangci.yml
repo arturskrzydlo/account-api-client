@@ -66,9 +66,9 @@ linters-settings:
     check-generated: false
     default-signifies-exhaustive: false
   goimports:
-    local-prefixes: github.com/arturskrzydlo/account-api-client
+    local-prefixes: github.com/arturskrzydlo/account-api-client/
   gocognit:
-    min-complexity: 15
+    min-complexity: 20
   gocritic:
     enabled-tags:
       - diagnostic

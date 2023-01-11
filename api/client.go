@@ -10,13 +10,17 @@ import (
 	"net/url"
 	"time"
 
-	"github.com/arturskrzydlo/account-api-client/api/internal/models"
+	"github.com/afex/hystrix-go/hystrix"
 	"go.uber.org/zap"
+
+	"github.com/arturskrzydlo/account-api-client/api/internal/models"
 )
 
 const (
-	defaultTimeout = time.Second * 10
-	jsonType       = "application/json"
+	defaultTimeout                         = time.Second * 10
+	jsonType                               = "application/json"
+	hystrixCommandName                     = "account-client"
+	defaultHystrixErrorPercentageThreshold = 30
 )
 
 type AccountClient interface {
@@ -26,11 +30,10 @@ type AccountClient interface {
 }
 
 type client struct {
-	baseURL         string
-	logger          *zap.Logger
-	httpClient      *http.Client
-	retryPolicy     RetryPolicy
-	backoffStrategy BackOffStrategy
+	baseURL    string
+	logger     *zap.Logger
+	httpClient *http.Client
+	retrier    Retrier
 }
 
 func NewAccountsClient(baseURL string, options ...ClientOption) (*client, error) {
@@ -39,6 +42,11 @@ func NewAccountsClient(baseURL string, options ...ClientOption) (*client, error)
 	if err != nil {
 		return nil, fmt.Errorf("invalid url provided: %w", err)
 	}
+
+	hystrix.ConfigureCommand(hystrixCommandName, hystrix.CommandConfig{
+		ErrorPercentThreshold: defaultHystrixErrorPercentageThreshold,
+		Timeout:               int(defaultTimeout.Milliseconds()),
+	})
 
 	// default client config
 	cfg := clientConfig{
@@ -52,11 +60,13 @@ func NewAccountsClient(baseURL string, options ...ClientOption) (*client, error)
 	}
 
 	return &client{
-		baseURL:         baseURL,
-		httpClient:      cfg.httpClient,
-		logger:          logger,
-		retryPolicy:     cfg.retryPolicy,
-		backoffStrategy: cfg.backoffStrategy,
+		baseURL:    baseURL,
+		httpClient: cfg.httpClient,
+		logger:     logger,
+		retrier: Retrier{
+			retryPolicy: cfg.retryPolicy,
+			backoff:     cfg.backoffStrategy,
+		},
 	}, nil
 }
 
@@ -74,7 +84,7 @@ func WithRetriesOnDefaultRetryPolicy(maxRetries int) ClientOption {
 	}
 }
 
-func WithCustomHttpClient(httpClient *http.Client) ClientOption {
+func WithCustomHTTPClient(httpClient *http.Client) ClientOption {
 	return func(cfg *clientConfig) {
 		cfg.httpClient = httpClient
 	}
@@ -153,16 +163,36 @@ func (c *client) sendRequest(ctx context.Context, request *http.Request, result 
 	request = request.WithContext(ctx)
 	setContentType(request)
 
-	res, err := retry(c.retryPolicy, c.backoffStrategy, func() (*http.Response, error) {
-		res, err := c.httpClient.Do(request)
-		if err != nil {
-			return nil, fmt.Errorf("failed to make request to an api : %w", err)
+	var resBody []byte
+	err := hystrix.Do(hystrixCommandName, func() error {
+		body, err := c.sendRequestWithRetries(request)
+		resBody = body
+		return err
+	}, nil)
+	if err != nil {
+		return fmt.Errorf("failed to send request to an api: %w", err)
+	}
+
+	if result != nil && resBody != nil {
+		if err = json.Unmarshal(resBody, result); err != nil {
+			return fmt.Errorf("failed to unmarshall response body: %w", err)
+		}
+	}
+
+	return nil
+}
+
+func (c *client) sendRequestWithRetries(request *http.Request) ([]byte, error) {
+	res, err := c.retrier.retry(func() (*http.Response, error) {
+		response, resErr := c.httpClient.Do(request)
+		if resErr != nil {
+			return nil, fmt.Errorf("failed to make request to an api : %w", resErr)
 		}
 
-		return res, nil
+		return response, nil
 	})
 	if err != nil {
-		return fmt.Errorf("failed to send request : %w", err)
+		return nil, fmt.Errorf("failed to send request : %w", err)
 	}
 
 	defer func() {
@@ -173,20 +203,14 @@ func (c *client) sendRequest(ctx context.Context, request *http.Request, result 
 
 	resBody, err := io.ReadAll(res.Body)
 	if err != nil {
-		return fmt.Errorf("failed to read response body: %w", err)
+		return nil, fmt.Errorf("failed to read response body: %w", err)
 	}
 
 	if res.StatusCode >= http.StatusBadRequest {
-		return c.reqErrFromResponse(resBody, res.StatusCode)
+		return nil, c.reqErrFromResponse(resBody, res.StatusCode)
 	}
 
-	if result != nil {
-		if err = json.Unmarshal(resBody, result); err != nil {
-			return fmt.Errorf("failed to unmarshall response body: %w", err)
-		}
-	}
-
-	return nil
+	return resBody, nil
 }
 
 func setContentType(req *http.Request) string {
