@@ -37,11 +37,6 @@ func NewAccountClient(baseURL string, options ...ClientOption) (*Client, error) 
 		return nil, fmt.Errorf("invalid url provided: %w", err)
 	}
 
-	hystrix.ConfigureCommand(hystrixCommandName, hystrix.CommandConfig{
-		ErrorPercentThreshold: defaultHystrixErrorPercentageThreshold,
-		Timeout:               int(defaultTimeout.Milliseconds()),
-	})
-
 	// default client config
 	cfg := ClientConfig{
 		HTTPClient:      &http.Client{Timeout: defaultTimeout},
@@ -52,6 +47,11 @@ func NewAccountClient(baseURL string, options ...ClientOption) (*Client, error) 
 	for _, option := range options {
 		option(&cfg)
 	}
+
+	hystrix.ConfigureCommand(hystrixCommandName, hystrix.CommandConfig{
+		ErrorPercentThreshold: defaultHystrixErrorPercentageThreshold,
+		Timeout:               int(defaultTimeout.Milliseconds()),
+	})
 
 	return &Client{
 		baseURL:    baseURL,
