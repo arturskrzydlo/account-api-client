@@ -1,7 +1,10 @@
 package accountclient
 
 import (
+	"bytes"
 	"errors"
+	"fmt"
+	"io"
 	"math"
 	"net/http"
 	"net/url"
@@ -13,10 +16,25 @@ type retrier struct {
 	backoff     BackOffStrategy
 }
 
-func (r retrier) retry(fn func() (*http.Response, error)) (*http.Response, error) {
+func (r retrier) retry(request *http.Request, fn func(request *http.Request) (*http.Response, error)) (*http.Response, error) {
+	var originalBody []byte
+	var err error
+
 	maxRetries := r.retryPolicy.NumberOfRetries()
 	retriesCount := 0
-	res, err := fn()
+
+	// need to copy body between retries because body is closed on each
+	// request call automatically
+	if request != nil && request.Body != http.NoBody {
+		originalBody, err = copyBody(request.Body)
+		if err != nil {
+			return nil, fmt.Errorf("failed fo copy request body: %w", err)
+		}
+		resetBody(request, originalBody)
+	}
+
+	res, err := fn(request)
+
 	for {
 		if !r.retryPolicy.ShouldRetry(err, res) {
 			break
@@ -26,7 +44,8 @@ func (r retrier) retry(fn func() (*http.Response, error)) (*http.Response, error
 		}
 
 		time.Sleep(r.backoff.delay(retriesCount))
-		res, err = fn()
+		resetBody(request, originalBody)
+		res, err = fn(request)
 		retriesCount++
 	}
 	return res, err
@@ -92,4 +111,20 @@ func (mrp DefaultRetryPolicy) ShouldRetry(err error, response *http.Response) bo
 	}
 
 	return errFromHTTPClient || serverSideStatusCode
+}
+
+func resetBody(request *http.Request, originalBody []byte) {
+	request.Body = io.NopCloser(bytes.NewBuffer(originalBody))
+}
+
+func copyBody(src io.ReadCloser) ([]byte, error) {
+	body, err := io.ReadAll(src)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read request body: %w", err)
+	}
+	err = src.Close()
+	if err != nil {
+		return nil, fmt.Errorf("failed to close request body: %w", err)
+	}
+	return body, nil
 }

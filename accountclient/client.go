@@ -84,6 +84,18 @@ func WithCustomHTTPClient(httpClient *http.Client) ClientOption {
 	}
 }
 
+func WithCustomRetryPolicy(retryPolicy RetryPolicy) ClientOption {
+	return func(cfg *ClientConfig) {
+		cfg.RetryPolicy = retryPolicy
+	}
+}
+
+func WithCustomBackoffStrategy(backoff BackOffStrategy) ClientOption {
+	return func(cfg *ClientConfig) {
+		cfg.BackoffStrategy = backoff
+	}
+}
+
 func WithExponentialBackoffStrategy(initialDelay time.Duration, multiplier int) ClientOption {
 	return func(cfg *ClientConfig) {
 		cfg.BackoffStrategy = &ExponentialBackoffStrategy{
@@ -173,7 +185,7 @@ func (c *Client) sendRequest(ctx context.Context, request *http.Request, result 
 }
 
 func (c *Client) sendRequestWithRetries(request *http.Request) ([]byte, error) {
-	res, err := c.retrier.retry(func() (*http.Response, error) {
+	res, err := c.retrier.retry(request, func(req *http.Request) (*http.Response, error) {
 		response, resErr := c.httpClient.Do(request)
 		if resErr != nil {
 			return nil, fmt.Errorf("failed to make request to an api : %w", resErr)

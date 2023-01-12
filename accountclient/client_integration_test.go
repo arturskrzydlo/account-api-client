@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"os"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/suite"
@@ -23,6 +24,21 @@ type accountApiClientIntegrationSuite struct {
 	accountApiClient *Client
 }
 
+type CustomRetryPolicy struct {
+	maxRetries int
+}
+
+func (c CustomRetryPolicy) ShouldRetry(err error, response *http.Response) bool {
+	if response != nil {
+		return response.StatusCode >= http.StatusBadRequest
+	}
+	return false
+}
+
+func (c CustomRetryPolicy) NumberOfRetries() int {
+	return c.maxRetries
+}
+
 func TestAccountApiClient(t *testing.T) {
 	suite.Run(t, &accountApiClientIntegrationSuite{})
 }
@@ -31,9 +47,25 @@ func (s *accountApiClientIntegrationSuite) SetupSuite() {
 	s.accountApiClient = createAccountClient()
 }
 
+func getHostname() string {
+	return os.Getenv("ACCOUNT_API_HOSTNAME")
+}
+
 func createAccountClient() *Client {
-	hostname := os.Getenv("ACCOUNT_API_HOSTNAME")
-	accountApiClient, err := NewAccountClient(fmt.Sprintf("http://%s:8080/v1", hostname))
+	accountApiClient, err := NewAccountClient(fmt.Sprintf("http://%s:8080/v1", getHostname()),
+		WithRetriesOnDefaultRetryPolicy(3),
+		WithLinearBackoffStrategy(time.Millisecond*100))
+	if err != nil {
+		log.Fatal("failed to create account api client")
+	}
+	return accountApiClient
+}
+
+// client to test e2e retries and set more restrictive retry policy
+// where retries are triggered also on 4xx codes
+func customRetryPolicyAccountClient() *Client {
+	accountApiClient, err := NewAccountClient(fmt.Sprintf("http://%s:8080/v1", getHostname()),
+		WithCustomRetryPolicy(CustomRetryPolicy{3}), WithCustomHTTPClient(&http.Client{Timeout: time.Second * 60}))
 	if err != nil {
 		log.Fatal("failed to create account api client")
 	}
@@ -182,6 +214,47 @@ func (s *accountApiClientIntegrationSuite) TestDeleteAccount() {
 		s.Assert().False(errors.As(err, &reqErr))
 		s.Assert().NotNil(err)
 		s.accountApiClient = createAccountClient()
+	})
+}
+
+func (s *accountApiClientIntegrationSuite) TestRetriesAreApplied() {
+	// this test actually check if after retries we are receiving request errors
+	// it has been created after issue where on retries nil request were sent
+	// thus url.Error was returned from function
+	s.Run("should retry failed requests and return request error", func() {
+		// given
+		account := createAccountRequest()
+		s.accountApiClient = customRetryPolicyAccountClient()
+		err := s.accountApiClient.CreateAccount(context.Background(), account)
+		s.Require().NoError(err)
+
+		// when
+		// it should be retried and finished with error because we are attempting to
+		// create account with the same id
+		err = s.accountApiClient.CreateAccount(context.Background(), account)
+
+		// then
+		s.Require().Error(err)
+		var reqErr *RequestError
+		s.Assert().ErrorAs(err, &reqErr)
+		s.Assert().Equal(reqErr.statusCode, http.StatusConflict)
+	})
+
+	s.Run("should retry failed requests for fetching when we should have response body", func() {
+		// given
+		s.accountApiClient = customRetryPolicyAccountClient()
+
+		// when
+		// it should be retried and finished with error because we are attempting to
+		// create account with the same id
+		accountResp, err := s.accountApiClient.FetchAccount(context.Background(), uuid.New().String())
+
+		// then
+		s.Require().Error(err)
+		s.Assert().Nil(accountResp)
+		var reqErr *RequestError
+		s.Assert().ErrorAs(err, &reqErr)
+		s.Assert().Equal(reqErr.statusCode, http.StatusNotFound)
 	})
 }
 
