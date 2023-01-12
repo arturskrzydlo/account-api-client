@@ -11,13 +11,14 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"net/url"
+	"os"
 	"time"
 
 	"github.com/afex/hystrix-go/hystrix"
 	"github.com/google/uuid"
-	"go.uber.org/zap"
 
 	"github.com/arturskrzydlo/account-api-client/accountclient/models"
 )
@@ -38,7 +39,6 @@ const (
 // Depending on configuration in ClientConfig requests might be also retries. By default, retries are switched off
 type Client struct {
 	baseURL    string
-	logger     *zap.Logger
 	httpClient *http.Client
 	retrier    retrier
 }
@@ -47,7 +47,6 @@ type Client struct {
 // baseURL must be a valid URL otherwise creation of a new account will finish with error
 // ClientOption are optional parameters which modify ClientConfig. Those parameters are evaluated and can modify ClientConfig
 func NewAccountClient(baseURL string, options ...ClientOption) (*Client, error) {
-	logger, _ := zap.NewProduction()
 	_, err := url.ParseRequestURI(baseURL)
 	if err != nil {
 		return nil, fmt.Errorf("invalid url provided: %w", err)
@@ -72,7 +71,6 @@ func NewAccountClient(baseURL string, options ...ClientOption) (*Client, error) 
 	return &Client{
 		baseURL:    baseURL,
 		httpClient: cfg.HTTPClient,
-		logger:     logger,
 		retrier: retrier{
 			retryPolicy: cfg.RetryPolicy,
 			backoff:     cfg.BackoffStrategy,
@@ -240,7 +238,8 @@ func (c *Client) sendRequestWithRetries(request *http.Request) ([]byte, error) {
 
 	defer func() {
 		if errClose := res.Body.Close(); errClose != nil {
-			c.logger.Warn("failed to close response body", zap.Error(errClose))
+			logger := log.New(os.Stderr, "", 0)
+			logger.Printf("failed to close response body: %s", err.Error())
 		}
 	}()
 
