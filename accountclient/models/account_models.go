@@ -1,6 +1,10 @@
 package models
 
-import "time"
+import (
+	"time"
+
+	"github.com/google/uuid"
+)
 
 // Account represents an account in the form3 org section.
 // See https://api-docs.form3.tech/api.html#organisation-accounts for
@@ -16,8 +20,8 @@ type CreateAccountRequest struct {
 
 type CreateAccountData struct {
 	Attributes     *CreateAccountAttributes `json:"attributes,omitempty"`
-	ID             string                   `json:"id,omitempty"`
-	OrganisationID string                   `json:"organisation_id,omitempty"`
+	ID             uuid.UUID                `json:"id,omitempty"`
+	OrganisationID uuid.UUID                `json:"organisation_id,omitempty"`
 	Type           string                   `json:"type,omitempty"`
 	Version        *int64                   `json:"version,omitempty"`
 }
@@ -46,8 +50,8 @@ type AccountResponse struct {
 
 type AccountDataResponse struct {
 	Attributes     *AccountAttributesResponse `json:"attributes,omitempty"`
-	ID             string                     `json:"id,omitempty"`
-	OrganisationID string                     `json:"organisation_id,omitempty"`
+	ID             uuid.UUID                  `json:"id,omitempty"`
+	OrganisationID uuid.UUID                  `json:"organisation_id,omitempty"`
 	Type           string                     `json:"type,omitempty"`
 	Version        *int64                     `json:"version,omitempty"`
 	CreatedOn      time.Time                  `json:"created_on"`

@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/afex/hystrix-go/hystrix"
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/suite"
 
 	"github.com/arturskrzydlo/account-api-client/accountclient/models"
@@ -92,7 +93,7 @@ func (s *accountAPIClientSuite) TestRetryPolicies() {
 		s.Assert().NoError(err)
 
 		// when
-		_, err = accountsClient.FetchAccount(context.Background(), "account-id")
+		_, err = accountsClient.FetchAccount(context.Background(), uuid.New())
 
 		// then
 		var reqErr *RequestError
@@ -114,8 +115,8 @@ func (s *accountAPIClientSuite) TestRetryPolicies() {
 				w.WriteHeader(http.StatusOK)
 				response, _ := json.Marshal(models.AccountResponse{Data: &models.AccountDataResponse{
 					Attributes:     nil,
-					ID:             "some-id",
-					OrganisationID: "org-id",
+					ID:             uuid.New(),
+					OrganisationID: uuid.New(),
 				}})
 				_, err := w.Write(response)
 				s.Require().NoError(err)
@@ -126,7 +127,7 @@ func (s *accountAPIClientSuite) TestRetryPolicies() {
 		s.Assert().NoError(err)
 
 		// when
-		account, err := accountsClient.FetchAccount(context.Background(), "account-id")
+		account, err := accountsClient.FetchAccount(context.Background(), uuid.New())
 
 		// then
 		s.Require().NoError(err)
@@ -205,7 +206,7 @@ func (s *accountAPIClientSuite) TestBackoffStrategies() {
 
 		// when
 		startTime := time.Now()
-		_, err = accountsClient.FetchAccount(context.Background(), "account-id")
+		_, err = accountsClient.FetchAccount(context.Background(), uuid.New())
 		endTime := time.Now()
 
 		// then
@@ -228,12 +229,12 @@ func (s *accountAPIClientSuite) TestBackoffStrategies() {
 			WithExponentialBackoffStrategy(delay, multiplier))
 		s.Assert().NoError(err)
 
-		_, err = accountsClient.FetchAccount(context.Background(), "account-id")
+		_, err = accountsClient.FetchAccount(context.Background(), uuid.New())
 		s.Assert().Error(err)
 
 		// when
 		startTime := time.Now()
-		err = accountsClient.DeleteAccount(context.Background(), "account-id", 0)
+		err = accountsClient.DeleteAccount(context.Background(), uuid.New(), 0)
 		endTime := time.Now()
 
 		// then
@@ -290,11 +291,11 @@ func (s *accountAPIClientSuite) TestClientCircuitBreaker() {
 		// when
 		serverCalls := 40
 		for i := 0; i < serverCalls; i++ {
-			_, err = accountsClient.FetchAccount(context.Background(), "account-id")
+			_, err = accountsClient.FetchAccount(context.Background(), uuid.New())
 			s.Assert().Error(err)
 		}
 
-		_, _ = accountsClient.FetchAccount(context.Background(), "account-id")
+		_, _ = accountsClient.FetchAccount(context.Background(), uuid.New())
 
 		// then
 		s.Assert().True(numCalls < serverCalls)

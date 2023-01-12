@@ -137,7 +137,7 @@ func (s *accountApiClientIntegrationSuite) TestFetchAccount() {
 
 	s.Run("should return error when there is no account for given accountID", func() {
 		// given
-		accountID := uuid.New().String()
+		accountID := uuid.New()
 
 		// when
 		fetchedAccount, err := s.accountApiClient.FetchAccount(context.Background(), accountID)
@@ -151,7 +151,7 @@ func (s *accountApiClientIntegrationSuite) TestFetchAccount() {
 
 	s.Run("should return error without error code when there is any issue with request", func() {
 		// given
-		accountID := uuid.New().String()
+		accountID := uuid.New()
 		s.accountApiClient.baseURL = "http://localhost:9999/fake/url/v1"
 
 		// when
@@ -187,7 +187,7 @@ func (s *accountApiClientIntegrationSuite) TestDeleteAccount() {
 
 	s.Run("should return error with status code when it was not possible to delete account", func() {
 		// given
-		accountID := uuid.New().String()
+		accountID := uuid.New()
 		accountVersion := int64(0)
 
 		// when
@@ -202,7 +202,7 @@ func (s *accountApiClientIntegrationSuite) TestDeleteAccount() {
 
 	s.Run("should return error without error code when there is any issue with request", func() {
 		// given
-		accountID := uuid.New().String()
+		accountID := uuid.New()
 		accountVersion := int64(0)
 		s.accountApiClient.baseURL = "http://localhost:9999/fake/url/v1"
 
@@ -247,7 +247,7 @@ func (s *accountApiClientIntegrationSuite) TestRetriesAreApplied() {
 		// when
 		// it should be retried and finished with error because we are attempting to
 		// create account with the same id
-		accountResp, err := s.accountApiClient.FetchAccount(context.Background(), uuid.New().String())
+		accountResp, err := s.accountApiClient.FetchAccount(context.Background(), uuid.New())
 
 		// then
 		s.Require().Error(err)
@@ -259,8 +259,8 @@ func (s *accountApiClientIntegrationSuite) TestRetriesAreApplied() {
 }
 
 func createAccountRequest() *models.CreateAccountRequest {
-	accountID := uuid.New().String()
-	organizationID := uuid.New().String()
+	accountID := uuid.New()
+	organizationID := uuid.New()
 	version := new(int64)
 	*version = 0
 	accountClassification := "Personal"

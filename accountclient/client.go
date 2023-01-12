@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/afex/hystrix-go/hystrix"
+	"github.com/google/uuid"
 	"go.uber.org/zap"
 
 	"github.com/arturskrzydlo/account-api-client/accountclient/models"
@@ -130,9 +131,9 @@ func (c *Client) CreateAccount(ctx context.Context, accountData *models.CreateAc
 	return nil
 }
 
-func (c *Client) FetchAccount(ctx context.Context, accountID string) (account *models.AccountResponse, err error) {
+func (c *Client) FetchAccount(ctx context.Context, accountID uuid.UUID) (account *models.AccountResponse, err error) {
 	request, err := http.NewRequest(http.MethodGet,
-		fmt.Sprintf("%s/organisation/accounts/%s", c.baseURL, accountID), http.NoBody)
+		fmt.Sprintf("%s/organisation/accounts/%s", c.baseURL, accountID.String()), http.NoBody)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create fetche account request: %w", err)
 	}
@@ -145,7 +146,7 @@ func (c *Client) FetchAccount(ctx context.Context, accountID string) (account *m
 	return &accountResponse, nil
 }
 
-func (c *Client) DeleteAccount(ctx context.Context, accountID string, version int64) error {
+func (c *Client) DeleteAccount(ctx context.Context, accountID uuid.UUID, version int64) error {
 	request, err := http.NewRequest(http.MethodDelete,
 		fmt.Sprintf("%s/organisation/accounts/%s?version=%d", c.baseURL, accountID, version),
 		http.NoBody)
