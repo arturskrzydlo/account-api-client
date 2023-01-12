@@ -44,9 +44,9 @@ func NewAccountClient(baseURL string, options ...ClientOption) (*Client, error) 
 
 	// default client config
 	cfg := ClientConfig{
-		httpClient:      &http.Client{Timeout: defaultTimeout},
-		retryPolicy:     DefaultRetryPolicy{MaxRetries: 0},
-		backoffStrategy: NoBackoffStrategy{},
+		HTTPClient:      &http.Client{Timeout: defaultTimeout},
+		RetryPolicy:     DefaultRetryPolicy{MaxRetries: 0},
+		BackoffStrategy: NoBackoffStrategy{},
 	}
 
 	for _, option := range options {
@@ -55,11 +55,11 @@ func NewAccountClient(baseURL string, options ...ClientOption) (*Client, error) 
 
 	return &Client{
 		baseURL:    baseURL,
-		httpClient: cfg.httpClient,
+		httpClient: cfg.HTTPClient,
 		logger:     logger,
 		retrier: retrier{
-			retryPolicy: cfg.retryPolicy,
-			backoff:     cfg.backoffStrategy,
+			retryPolicy: cfg.RetryPolicy,
+			backoff:     cfg.BackoffStrategy,
 		},
 	}, nil
 }
@@ -67,26 +67,26 @@ func NewAccountClient(baseURL string, options ...ClientOption) (*Client, error) 
 type ClientOption func(config *ClientConfig)
 
 type ClientConfig struct {
-	httpClient      *http.Client
-	retryPolicy     RetryPolicy
-	backoffStrategy BackOffStrategy
+	HTTPClient      *http.Client
+	RetryPolicy     RetryPolicy
+	BackoffStrategy BackOffStrategy
 }
 
 func WithRetriesOnDefaultRetryPolicy(maxRetries int) ClientOption {
 	return func(cfg *ClientConfig) {
-		cfg.retryPolicy = DefaultRetryPolicy{MaxRetries: maxRetries}
+		cfg.RetryPolicy = DefaultRetryPolicy{MaxRetries: maxRetries}
 	}
 }
 
 func WithCustomHTTPClient(httpClient *http.Client) ClientOption {
 	return func(cfg *ClientConfig) {
-		cfg.httpClient = httpClient
+		cfg.HTTPClient = httpClient
 	}
 }
 
 func WithExponentialBackoffStrategy(initialDelay time.Duration, multiplier int) ClientOption {
 	return func(cfg *ClientConfig) {
-		cfg.backoffStrategy = &ExponentialBackoffStrategy{
+		cfg.BackoffStrategy = &ExponentialBackoffStrategy{
 			initialDelay: initialDelay,
 			multiplier:   multiplier,
 		}
@@ -95,12 +95,8 @@ func WithExponentialBackoffStrategy(initialDelay time.Duration, multiplier int) 
 
 func WithLinearBackoffStrategy(delay time.Duration) ClientOption {
 	return func(cfg *ClientConfig) {
-		cfg.backoffStrategy = LinearBackoffStrategy{delayTime: delay}
+		cfg.BackoffStrategy = LinearBackoffStrategy{delayTime: delay}
 	}
-}
-
-type ResponseBody struct {
-	ErrorMessage string `json:"error_message"`
 }
 
 func (c *Client) CreateAccount(ctx context.Context, accountData *models.CreateAccountRequest) error {
