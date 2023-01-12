@@ -50,7 +50,7 @@ func NewAccountClient(baseURL string, options ...ClientOption) (*Client, error) 
 
 	hystrix.ConfigureCommand(hystrixCommandName, hystrix.CommandConfig{
 		ErrorPercentThreshold: defaultHystrixErrorPercentageThreshold,
-		Timeout:               int(defaultTimeout.Milliseconds()),
+		Timeout:               int(cfg.HTTPClient.Timeout.Milliseconds()),
 	})
 
 	return &Client{
