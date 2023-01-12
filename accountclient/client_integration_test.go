@@ -12,6 +12,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/afex/hystrix-go/hystrix"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/suite"
 
@@ -45,6 +46,10 @@ func TestAccountApiClient(t *testing.T) {
 
 func (s *accountApiClientIntegrationSuite) SetupSuite() {
 	s.accountApiClient = createAccountClient()
+}
+
+func (s *accountApiClientIntegrationSuite) AfterTest(_, _ string) {
+	hystrix.Flush()
 }
 
 func getHostname() string {
