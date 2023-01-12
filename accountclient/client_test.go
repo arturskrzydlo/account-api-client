@@ -98,7 +98,7 @@ func (s *accountAPIClientSuite) TestRetryPolicies() {
 		// then
 		var reqErr *RequestError
 		s.Assert().True(errors.As(err, &reqErr))
-		s.Assert().Equal(http.StatusInternalServerError, reqErr.statusCode)
+		s.Assert().Equal(http.StatusInternalServerError, reqErr.StatusCode)
 		s.Assert().Equal(maxRetries+1, numCalls)
 	})
 
@@ -138,7 +138,7 @@ func (s *accountAPIClientSuite) TestRetryPolicies() {
 	s.Run("test default retry policy", func() {
 		// given
 		defaultRetryPolicy := DefaultRetryPolicy{
-			MaxRetries: 2,
+			maxRetries: 2,
 		}
 
 		testCases := map[string]struct {
@@ -233,8 +233,9 @@ func (s *accountAPIClientSuite) TestBackoffStrategies() {
 		s.Assert().Error(err)
 
 		// when
+		accountVersion := int64(0)
 		startTime := time.Now()
-		err = accountsClient.DeleteAccount(context.Background(), uuid.New(), 0)
+		err = accountsClient.DeleteAccount(context.Background(), uuid.New(), &accountVersion)
 		endTime := time.Now()
 
 		// then
@@ -253,7 +254,7 @@ func (s *accountAPIClientSuite) TestBackoffStrategies() {
 		// when
 		var delay time.Duration
 		for i := 0; i < 3; i++ {
-			delay = backoff.delay(i)
+			delay = backoff.Delay(i)
 		}
 
 		// then
@@ -267,7 +268,7 @@ func (s *accountAPIClientSuite) TestBackoffStrategies() {
 		}
 
 		// when
-		delay := backoff.delay(0)
+		delay := backoff.Delay(0)
 
 		// then
 		s.Assert().Equal(backoff.delayTime, delay)

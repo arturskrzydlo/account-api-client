@@ -78,10 +78,11 @@ func (s *accountApiClientIntegrationSuite) TestCreateAccount() {
 		account := createAccountRequest()
 
 		// when
-		err := s.accountApiClient.CreateAccount(context.Background(), account)
+		accountResp, err := s.accountApiClient.CreateAccount(context.Background(), account)
 
 		// then
 		s.Assert().NoError(err)
+		s.assertCreatedAccount(account.Data, accountResp.Data)
 		fetchedAccount, err := s.accountApiClient.FetchAccount(context.Background(), account.Data.ID)
 		s.Assert().NoError(err)
 		s.assertCreatedAccount(account.Data, fetchedAccount.Data)
@@ -93,16 +94,17 @@ func (s *accountApiClientIntegrationSuite) TestCreateAccount() {
 		account.Data.Attributes.Country = nil
 
 		// when
-		err := s.accountApiClient.CreateAccount(context.Background(), account)
+		accountResp, err := s.accountApiClient.CreateAccount(context.Background(), account)
 
 		// then
+		s.Assert().Nil(accountResp)
 		var reqErr *RequestError
 		s.Assert().ErrorAs(err, &reqErr)
-		s.Assert().Equal(reqErr.statusCode, 400)
-		s.Assert().NotEmpty(reqErr.errMsg)
+		s.Assert().Equal(reqErr.StatusCode, 400)
+		s.Assert().NotEmpty(reqErr.ErrMsg)
 		_, err = s.accountApiClient.FetchAccount(context.Background(), account.Data.ID)
 		s.Assert().ErrorAs(err, &reqErr)
-		s.Assert().Equal(reqErr.statusCode, 404)
+		s.Assert().Equal(reqErr.StatusCode, 404)
 	})
 
 	s.Run("should return error without error code when there is issue with request", func() {
@@ -110,9 +112,10 @@ func (s *accountApiClientIntegrationSuite) TestCreateAccount() {
 		account := createAccountRequest()
 		s.accountApiClient.baseURL = "http://localhost:9999/fake/url/v1"
 		// when
-		err := s.accountApiClient.CreateAccount(context.Background(), account)
+		accountResp, err := s.accountApiClient.CreateAccount(context.Background(), account)
 
 		// then
+		s.Assert().Nil(accountResp)
 		var reqErr *RequestError
 		s.Assert().False(errors.As(err, &reqErr))
 		s.Assert().NotNil(err)
@@ -124,7 +127,7 @@ func (s *accountApiClientIntegrationSuite) TestFetchAccount() {
 	s.Run("should successfully fetch single account", func() {
 		// given
 		account := createAccountRequest()
-		err := s.accountApiClient.CreateAccount(context.Background(), account)
+		_, err := s.accountApiClient.CreateAccount(context.Background(), account)
 		s.Require().NoError(err)
 
 		// when
@@ -146,7 +149,7 @@ func (s *accountApiClientIntegrationSuite) TestFetchAccount() {
 		s.Assert().Nil(fetchedAccount)
 		var reqErr *RequestError
 		s.Assert().ErrorAs(err, &reqErr)
-		s.Assert().Equal(reqErr.statusCode, http.StatusNotFound)
+		s.Assert().Equal(reqErr.StatusCode, http.StatusNotFound)
 	})
 
 	s.Run("should return error without error code when there is any issue with request", func() {
@@ -170,18 +173,18 @@ func (s *accountApiClientIntegrationSuite) TestDeleteAccount() {
 	s.Run("should successfully delete single account", func() {
 		// given
 		account := createAccountRequest()
-		err := s.accountApiClient.CreateAccount(context.Background(), account)
+		accountRes, err := s.accountApiClient.CreateAccount(context.Background(), account)
 		s.Require().NoError(err)
 
 		// when
-		err = s.accountApiClient.DeleteAccount(context.Background(), account.Data.ID, *account.Data.Version)
+		err = s.accountApiClient.DeleteAccount(context.Background(), account.Data.ID, accountRes.Data.Version)
 
 		// then
 		s.Require().NoError(err)
 		fetchedAccount, err := s.accountApiClient.FetchAccount(context.Background(), account.Data.ID)
 		var reqErr *RequestError
 		s.Assert().ErrorAs(err, &reqErr)
-		s.Assert().Equal(reqErr.statusCode, http.StatusNotFound)
+		s.Assert().Equal(reqErr.StatusCode, http.StatusNotFound)
 		s.Assert().Nil(fetchedAccount)
 	})
 
@@ -191,13 +194,13 @@ func (s *accountApiClientIntegrationSuite) TestDeleteAccount() {
 		accountVersion := int64(0)
 
 		// when
-		err := s.accountApiClient.DeleteAccount(context.Background(), accountID, accountVersion)
+		err := s.accountApiClient.DeleteAccount(context.Background(), accountID, &accountVersion)
 
 		// then
 		var reqErr *RequestError
 		s.Assert().ErrorAs(err, &reqErr)
-		s.Assert().Equal(reqErr.statusCode, http.StatusNotFound)
-		s.Assert().Empty(reqErr.errMsg)
+		s.Assert().Equal(reqErr.StatusCode, http.StatusNotFound)
+		s.Assert().Empty(reqErr.ErrMsg)
 	})
 
 	s.Run("should return error without error code when there is any issue with request", func() {
@@ -207,7 +210,7 @@ func (s *accountApiClientIntegrationSuite) TestDeleteAccount() {
 		s.accountApiClient.baseURL = "http://localhost:9999/fake/url/v1"
 
 		// when
-		err := s.accountApiClient.DeleteAccount(context.Background(), accountID, accountVersion)
+		err := s.accountApiClient.DeleteAccount(context.Background(), accountID, &accountVersion)
 
 		// then
 		var reqErr *RequestError
@@ -218,26 +221,26 @@ func (s *accountApiClientIntegrationSuite) TestDeleteAccount() {
 }
 
 func (s *accountApiClientIntegrationSuite) TestRetriesAreApplied() {
-	// this test actually check if after retries we are receiving request errors
+	// these tests actually check if after retries we are receiving request errors
 	// it has been created after issue where on retries nil request were sent
 	// thus url.Error was returned from function
 	s.Run("should retry failed requests and return request error", func() {
 		// given
 		account := createAccountRequest()
 		s.accountApiClient = customRetryPolicyAccountClient()
-		err := s.accountApiClient.CreateAccount(context.Background(), account)
+		_, err := s.accountApiClient.CreateAccount(context.Background(), account)
 		s.Require().NoError(err)
 
 		// when
 		// it should be retried and finished with error because we are attempting to
 		// create account with the same id
-		err = s.accountApiClient.CreateAccount(context.Background(), account)
+		_, err = s.accountApiClient.CreateAccount(context.Background(), account)
 
 		// then
 		s.Require().Error(err)
 		var reqErr *RequestError
 		s.Assert().ErrorAs(err, &reqErr)
-		s.Assert().Equal(reqErr.statusCode, http.StatusConflict)
+		s.Assert().Equal(reqErr.StatusCode, http.StatusConflict)
 	})
 
 	s.Run("should retry failed requests for fetching when we should have response body", func() {
@@ -254,7 +257,7 @@ func (s *accountApiClientIntegrationSuite) TestRetriesAreApplied() {
 		s.Assert().Nil(accountResp)
 		var reqErr *RequestError
 		s.Assert().ErrorAs(err, &reqErr)
-		s.Assert().Equal(reqErr.statusCode, http.StatusNotFound)
+		s.Assert().Equal(reqErr.StatusCode, http.StatusNotFound)
 	})
 }
 

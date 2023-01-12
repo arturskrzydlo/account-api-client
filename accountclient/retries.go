@@ -13,7 +13,7 @@ import (
 
 type retrier struct {
 	retryPolicy RetryPolicy
-	backoff     BackOffStrategy
+	backoff     BackoffStrategy
 }
 
 func (r retrier) retry(request *http.Request, fn func(request *http.Request) (*http.Response, error)) (*http.Response, error) {
@@ -43,7 +43,7 @@ func (r retrier) retry(request *http.Request, fn func(request *http.Request) (*h
 			return res, err
 		}
 
-		time.Sleep(r.backoff.delay(retriesCount))
+		time.Sleep(r.backoff.Delay(retriesCount))
 		resetBody(request, originalBody)
 		res, err = fn(request)
 		retriesCount++
@@ -51,43 +51,56 @@ func (r retrier) retry(request *http.Request, fn func(request *http.Request) (*h
 	return res, err
 }
 
+// RetryPolicy allows to create custom policy for errors on which library will try to retry request
 type RetryPolicy interface {
+	// ShouldRetry based on error and http.Response decides if request should be retried
 	ShouldRetry(err error, response *http.Response) bool
+	// NumberOfRetries return how many times request should be retried
 	NumberOfRetries() int
 }
 
-type BackOffStrategy interface {
-	delay(retryCount int) time.Duration
+// BackoffStrategy allows to define strategy to make delays between next retries
+type BackoffStrategy interface {
+	// Delay returns how long should last a pause between next retries in time.Duration format.
+	// Output might be dependent on current retryCount
+	Delay(retryCount int) time.Duration
 }
 
+// DefaultRetryPolicy is simple policy which will retry when there is an error coming from http.Client (*url.Error) or response status code
+// is server side status code (5xx)
 type DefaultRetryPolicy struct {
-	MaxRetries int
+	// maxRetries how many retries should be applied in retry process
+	maxRetries int
 }
 
+// NoBackoffStrategy is marker of no delay (no backoff) between retries
 type NoBackoffStrategy struct{}
 
-func (n NoBackoffStrategy) delay(_ int) time.Duration {
+func (n NoBackoffStrategy) Delay(_ int) time.Duration {
 	return 0
 }
 
+// LinearBackoffStrategy is backoff in which delays between retries is constant
 type LinearBackoffStrategy struct {
+	// delayTime time between next retries
 	delayTime time.Duration
 }
 
-func (l LinearBackoffStrategy) delay(_ int) time.Duration {
+func (l LinearBackoffStrategy) Delay(_ int) time.Duration {
 	return l.delayTime
 }
 
 func (mrp DefaultRetryPolicy) NumberOfRetries() int {
-	return mrp.MaxRetries
+	return mrp.maxRetries
 }
 
+// ExponentialBackoffStrategy is backoff in which delays growing exponentially between next retries
 type ExponentialBackoffStrategy struct {
 	initialDelay time.Duration
 	multiplier   int
 }
 
-func (e ExponentialBackoffStrategy) delay(retryCount int) time.Duration {
+func (e ExponentialBackoffStrategy) Delay(retryCount int) time.Duration {
 	multiplier := math.Pow(float64(e.multiplier), float64(retryCount))
 	return e.initialDelay * time.Duration(multiplier)
 }

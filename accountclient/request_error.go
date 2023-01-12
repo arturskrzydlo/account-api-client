@@ -11,19 +11,19 @@ type errResponseBody struct {
 }
 
 type RequestError struct {
-	statusCode int
-	errMsg     string
+	StatusCode int
+	ErrMsg     string
 }
 
 func newRequestErr(statusCode int, err error) *RequestError {
 	return &RequestError{
-		statusCode: statusCode,
-		errMsg:     err.Error(),
+		StatusCode: statusCode,
+		ErrMsg:     err.Error(),
 	}
 }
 
 func (r *RequestError) Error() string {
-	return fmt.Sprintf("status %d: error: %v", r.statusCode, r.errMsg)
+	return fmt.Sprintf("status %d: error: %v", r.StatusCode, r.ErrMsg)
 }
 
 func (c *Client) reqErrFromResponse(responseBody []byte, statusCode int) error {
