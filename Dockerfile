@@ -9,4 +9,4 @@ WORKDIR /app
 
 COPY . .
 
-CMD make tidy && make all-tests
+CMD make all-tests
