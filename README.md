@@ -24,7 +24,7 @@ have been run
 In your project using go modules just run
 
 ```shell
-go get github.com/arturskrzydlo/account-api-client`
+go get github.com/arturskrzydlo/account-api-client
 ```
 
 ### Usage
@@ -33,7 +33,7 @@ Example of how to use library can be found in [documentation](#documentation).
 This is basic usage example taken from documentation :
 
 ```go
-        // client initialization
+// client initialization
 client, err := NewAccountClient("localhost:8080",
 WithRetriesOnDefaultRetryPolicy(3),
 WithLinearBackoffStrategy(time.Millisecond*100),
