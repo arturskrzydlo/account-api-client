@@ -1,6 +1,6 @@
 //go:build integration
 
-package api
+package accountclient
 
 import (
 	"context"
@@ -11,15 +11,16 @@ import (
 	"os"
 	"testing"
 
-	"github.com/arturskrzydlo/account-api-client/api/internal/models"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/suite"
+
+	"github.com/arturskrzydlo/account-api-client/accountclient/models"
 )
 
 type accountApiClientIntegrationSuite struct {
 	suite.Suite
 
-	accountApiClient *client
+	accountApiClient *Client
 }
 
 func TestAccountApiClient(t *testing.T) {
@@ -30,11 +31,11 @@ func (s *accountApiClientIntegrationSuite) SetupSuite() {
 	s.accountApiClient = createAccountClient()
 }
 
-func createAccountClient() *client {
+func createAccountClient() *Client {
 	hostname := os.Getenv("ACCOUNT_API_HOSTNAME")
-	accountApiClient, err := NewAccountsClient(fmt.Sprintf("http://%s:8080/v1", hostname))
+	accountApiClient, err := NewAccountClient(fmt.Sprintf("http://%s:8080/v1", hostname))
 	if err != nil {
-		log.Fatal("failed to create account accountApiClient")
+		log.Fatal("failed to create account api client")
 	}
 	return accountApiClient
 }

@@ -1,4 +1,4 @@
-package api
+package accountclient
 
 import (
 	"bytes"
@@ -13,7 +13,7 @@ import (
 	"github.com/afex/hystrix-go/hystrix"
 	"go.uber.org/zap"
 
-	"github.com/arturskrzydlo/account-api-client/api/internal/models"
+	"github.com/arturskrzydlo/account-api-client/accountclient/models"
 )
 
 const (
@@ -23,20 +23,14 @@ const (
 	defaultHystrixErrorPercentageThreshold = 30
 )
 
-type AccountClient interface {
-	CreateAccount(ctx context.Context, accountData *models.CreateAccountRequest) error
-	FetchAccount(ctx context.Context, accountID string) (account *models.AccountResponse, err error)
-	DeleteAccount(ctx context.Context, accountID string, version int64) error
-}
-
-type client struct {
+type Client struct {
 	baseURL    string
 	logger     *zap.Logger
 	httpClient *http.Client
-	retrier    Retrier
+	retrier    retrier
 }
 
-func NewAccountsClient(baseURL string, options ...ClientOption) (*client, error) {
+func NewAccountClient(baseURL string, options ...ClientOption) (*Client, error) {
 	logger, _ := zap.NewProduction()
 	_, err := url.ParseRequestURI(baseURL)
 	if err != nil {
@@ -49,7 +43,7 @@ func NewAccountsClient(baseURL string, options ...ClientOption) (*client, error)
 	})
 
 	// default client config
-	cfg := clientConfig{
+	cfg := ClientConfig{
 		httpClient:      &http.Client{Timeout: defaultTimeout},
 		retryPolicy:     DefaultRetryPolicy{MaxRetries: 0},
 		backoffStrategy: NoBackoffStrategy{},
@@ -59,39 +53,39 @@ func NewAccountsClient(baseURL string, options ...ClientOption) (*client, error)
 		option(&cfg)
 	}
 
-	return &client{
+	return &Client{
 		baseURL:    baseURL,
 		httpClient: cfg.httpClient,
 		logger:     logger,
-		retrier: Retrier{
+		retrier: retrier{
 			retryPolicy: cfg.retryPolicy,
 			backoff:     cfg.backoffStrategy,
 		},
 	}, nil
 }
 
-type ClientOption func(config *clientConfig)
+type ClientOption func(config *ClientConfig)
 
-type clientConfig struct {
+type ClientConfig struct {
 	httpClient      *http.Client
 	retryPolicy     RetryPolicy
 	backoffStrategy BackOffStrategy
 }
 
 func WithRetriesOnDefaultRetryPolicy(maxRetries int) ClientOption {
-	return func(cfg *clientConfig) {
+	return func(cfg *ClientConfig) {
 		cfg.retryPolicy = DefaultRetryPolicy{MaxRetries: maxRetries}
 	}
 }
 
 func WithCustomHTTPClient(httpClient *http.Client) ClientOption {
-	return func(cfg *clientConfig) {
+	return func(cfg *ClientConfig) {
 		cfg.httpClient = httpClient
 	}
 }
 
 func WithExponentialBackoffStrategy(initialDelay time.Duration, multiplier int) ClientOption {
-	return func(cfg *clientConfig) {
+	return func(cfg *ClientConfig) {
 		cfg.backoffStrategy = &ExponentialBackoffStrategy{
 			initialDelay: initialDelay,
 			multiplier:   multiplier,
@@ -100,7 +94,7 @@ func WithExponentialBackoffStrategy(initialDelay time.Duration, multiplier int) 
 }
 
 func WithLinearBackoffStrategy(delay time.Duration) ClientOption {
-	return func(cfg *clientConfig) {
+	return func(cfg *ClientConfig) {
 		cfg.backoffStrategy = LinearBackoffStrategy{delayTime: delay}
 	}
 }
@@ -109,7 +103,7 @@ type ResponseBody struct {
 	ErrorMessage string `json:"error_message"`
 }
 
-func (c *client) CreateAccount(ctx context.Context, accountData *models.CreateAccountRequest) error {
+func (c *Client) CreateAccount(ctx context.Context, accountData *models.CreateAccountRequest) error {
 	reqBody, err := json.Marshal(accountData)
 	if err != nil {
 		return fmt.Errorf("failed to serialize account body: %w", err)
@@ -128,7 +122,7 @@ func (c *client) CreateAccount(ctx context.Context, accountData *models.CreateAc
 	return nil
 }
 
-func (c *client) FetchAccount(ctx context.Context, accountID string) (account *models.AccountResponse, err error) {
+func (c *Client) FetchAccount(ctx context.Context, accountID string) (account *models.AccountResponse, err error) {
 	request, err := http.NewRequest(http.MethodGet,
 		fmt.Sprintf("%s/organisation/accounts/%s", c.baseURL, accountID), http.NoBody)
 	if err != nil {
@@ -143,7 +137,7 @@ func (c *client) FetchAccount(ctx context.Context, accountID string) (account *m
 	return &accountResponse, nil
 }
 
-func (c *client) DeleteAccount(ctx context.Context, accountID string, version int64) error {
+func (c *Client) DeleteAccount(ctx context.Context, accountID string, version int64) error {
 	request, err := http.NewRequest(http.MethodDelete,
 		fmt.Sprintf("%s/organisation/accounts/%s?version=%d", c.baseURL, accountID, version),
 		http.NoBody)
@@ -159,7 +153,7 @@ func (c *client) DeleteAccount(ctx context.Context, accountID string, version in
 	return nil
 }
 
-func (c *client) sendRequest(ctx context.Context, request *http.Request, result interface{}) error {
+func (c *Client) sendRequest(ctx context.Context, request *http.Request, result interface{}) error {
 	request = request.WithContext(ctx)
 	setContentType(request)
 
@@ -182,7 +176,7 @@ func (c *client) sendRequest(ctx context.Context, request *http.Request, result 
 	return nil
 }
 
-func (c *client) sendRequestWithRetries(request *http.Request) ([]byte, error) {
+func (c *Client) sendRequestWithRetries(request *http.Request) ([]byte, error) {
 	res, err := c.retrier.retry(func() (*http.Response, error) {
 		response, resErr := c.httpClient.Do(request)
 		if resErr != nil {

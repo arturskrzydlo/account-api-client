@@ -1,4 +1,4 @@
-package api
+package accountclient
 
 import (
 	"context"
@@ -13,7 +13,7 @@ import (
 	"github.com/afex/hystrix-go/hystrix"
 	"github.com/stretchr/testify/suite"
 
-	"github.com/arturskrzydlo/account-api-client/api/internal/models"
+	"github.com/arturskrzydlo/account-api-client/accountclient/models"
 )
 
 type accountAPIClientSuite struct {
@@ -62,7 +62,7 @@ func (s *accountAPIClientSuite) TestAccountClientCreation() {
 				httpClientOptions = append(httpClientOptions, WithCustomHTTPClient(tc.httpClient))
 			}
 			// when
-			accountClient, err := NewAccountsClient(tc.apiURL, httpClientOptions...)
+			accountClient, err := NewAccountClient(tc.apiURL, httpClientOptions...)
 			// then
 			if !tc.expectedErr {
 				s.NoError(err)
@@ -88,7 +88,7 @@ func (s *accountAPIClientSuite) TestRetryPolicies() {
 		}))
 
 		maxRetries := 3
-		accountsClient, err := NewAccountsClient(testServ.URL, WithRetriesOnDefaultRetryPolicy(maxRetries))
+		accountsClient, err := NewAccountClient(testServ.URL, WithRetriesOnDefaultRetryPolicy(maxRetries))
 		s.Assert().NoError(err)
 
 		// when
@@ -122,7 +122,7 @@ func (s *accountAPIClientSuite) TestRetryPolicies() {
 			}
 			numCalls++
 		}))
-		accountsClient, err := NewAccountsClient(testServ.URL, WithRetriesOnDefaultRetryPolicy(maxRetries))
+		accountsClient, err := NewAccountClient(testServ.URL, WithRetriesOnDefaultRetryPolicy(maxRetries))
 		s.Assert().NoError(err)
 
 		// when
@@ -198,7 +198,7 @@ func (s *accountAPIClientSuite) TestBackoffStrategies() {
 		delay := time.Millisecond * 1
 		maxRetries := 3
 		multiplier := 10
-		accountsClient, err := NewAccountsClient(testServ.URL,
+		accountsClient, err := NewAccountClient(testServ.URL,
 			WithRetriesOnDefaultRetryPolicy(maxRetries),
 			WithExponentialBackoffStrategy(delay, multiplier))
 		s.Assert().NoError(err)
@@ -223,7 +223,7 @@ func (s *accountAPIClientSuite) TestBackoffStrategies() {
 		delay := time.Millisecond * 1
 		maxRetries := 3
 		multiplier := 10
-		accountsClient, err := NewAccountsClient(testServ.URL,
+		accountsClient, err := NewAccountClient(testServ.URL,
 			WithRetriesOnDefaultRetryPolicy(maxRetries),
 			WithExponentialBackoffStrategy(delay, multiplier))
 		s.Assert().NoError(err)
@@ -281,7 +281,7 @@ func (s *accountAPIClientSuite) TestClientCircuitBreaker() {
 			numCalls++
 			http.Error(w, "server error", http.StatusInternalServerError)
 		}))
-		accountsClient, err := NewAccountsClient(testServ.URL)
+		accountsClient, err := NewAccountClient(testServ.URL)
 		s.Require().NoError(err)
 
 		// circuit breaker is configured for minimum 20 error calls to be opened

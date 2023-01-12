@@ -1,4 +1,4 @@
-package api
+package accountclient
 
 import (
 	"errors"
@@ -8,12 +8,12 @@ import (
 	"time"
 )
 
-type Retrier struct {
+type retrier struct {
 	retryPolicy RetryPolicy
 	backoff     BackOffStrategy
 }
 
-func (r Retrier) retry(fn func() (*http.Response, error)) (*http.Response, error) {
+func (r retrier) retry(fn func() (*http.Response, error)) (*http.Response, error) {
 	maxRetries := r.retryPolicy.NumberOfRetries()
 	retriesCount := 0
 	res, err := fn()
