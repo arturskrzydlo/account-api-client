@@ -261,6 +261,38 @@ func (s *accountApiClientIntegrationSuite) TestRetriesAreApplied() {
 	})
 }
 
+func (s *accountApiClientIntegrationSuite) TestSampleAccountFlow() {
+	s.Run("should create account, then fetch it and at the it should successfully delete it", func() {
+		// given
+		account := createAccountRequest()
+
+		// when creating account
+		accountResp, err := s.accountApiClient.CreateAccount(context.Background(), account)
+
+		// then
+		s.Assert().NoError(err)
+		s.assertCreatedAccount(account.Data, accountResp.Data)
+
+		// when fetching created account
+		fetchedAccount, err := s.accountApiClient.FetchAccount(context.Background(), account.Data.ID)
+
+		// then
+		s.Assert().NoError(err)
+		s.assertCreatedAccount(account.Data, fetchedAccount.Data)
+
+		// when deleting account
+		err = s.accountApiClient.DeleteAccount(context.Background(), fetchedAccount.Data.ID, fetchedAccount.Data.Version)
+
+		// then
+		s.Require().NoError(err)
+		fetchedAccount, err = s.accountApiClient.FetchAccount(context.Background(), fetchedAccount.Data.ID)
+		var reqErr *RequestError
+		s.Assert().ErrorAs(err, &reqErr)
+		s.Assert().Equal(reqErr.StatusCode, http.StatusNotFound)
+		s.Assert().Nil(fetchedAccount)
+	})
+}
+
 func createAccountRequest() *models.CreateAccountRequest {
 	accountID := uuid.New()
 	organizationID := uuid.New()
